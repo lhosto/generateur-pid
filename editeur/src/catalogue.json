@@ -1,0 +1,2920 @@
+{
+ "version": "HG-2026-10-20+fictif",
+ "date": "2026-10-20",
+ "fictif": true,
+ "sources": {
+  "hg": {
+   "fichier": "kit/sharepoint/Hardware Generic.csv",
+   "lignes": 140,
+   "principaux": 48,
+   "date": "2026-10-20"
+  },
+  "complements": "editeur/src/fictif/complements.fictif.json"
+ },
+ "hgTypes": {
+  "ACD": {
+   "label": "Purgeur automatique d'air comprimé",
+   "labelEn": "Automatic compressor drain",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "PS",
+    "PC"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "AIRC": {
+   "label": "Compresseur d'air",
+   "labelEn": "Air Compressor",
+   "principal": true,
+   "idWinCC": "291",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "PS",
+    "PC"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "B": {
+   "label": "Coffret électrique",
+   "labelEn": "BOX",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "BELT": {
+   "label": "Convoyeur",
+   "labelEn": "Conveyor belt",
+   "principal": true,
+   "idWinCC": "1",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [
+    "ESTO",
+    "SC",
+    "SG",
+    "SGL",
+    "LS",
+    "LT"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse",
+     "unit": "m/min",
+     "default": 30
+    }
+   ]
+  },
+  "BEST": {
+   "label": "Tapis stockeur",
+   "labelEn": "Storage Belt",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "Programmation en cours",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "BINT": {
+   "label": "Basculeur de bac poubelle",
+   "labelEn": "Bin tipper",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "BS": {
+   "label": "Crible balistique (Décartonneur; 2D/3D; Défilmeur)",
+   "labelEn": "Balistic Screen",
+   "principal": true,
+   "idWinCC": "231",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO",
+    "SG"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse",
+     "unit": "tr/min",
+     "default": 180
+    }
+   ]
+  },
+  "BYPA": {
+   "label": "Bypass avec gestion fin de course",
+   "labelEn": "Bypass",
+   "principal": true,
+   "idWinCC": "11",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [],
+   "options": [
+    "ZS",
+    "ZSS",
+    "ESTO",
+    "PB"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "C": {
+   "label": "Armoire électrique",
+   "labelEn": "Electrical cabinet",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO",
+    "HORN",
+    "REMO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CAB": {
+   "label": "Cabine de tri",
+   "labelEn": "Sorting cabin",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CADO": {
+   "label": "Capteur Porte Armoire",
+   "labelEn": "Cabinet Door Switch",
+   "principal": false,
+   "idWinCC": "661",
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CAMD": {
+   "label": "Caméra",
+   "labelEn": "Camera2D",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CAMT": {
+   "label": "Caméra 3d",
+   "labelEn": "Camera 3d",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CATE": {
+   "label": "Thermostat de température armoire",
+   "labelEn": "Cabinet Temperature Switch",
+   "principal": false,
+   "idWinCC": "721",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "COMP": {
+   "label": "Compacteur",
+   "labelEn": "Compactor",
+   "principal": true,
+   "idWinCC": "301",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CONN": {
+   "label": "Connecteur divers",
+   "labelEn": "Connector",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CT": {
+   "label": "Transmetteur de mesure de courant - Ne permet pas de mesure l'énergie",
+   "labelEn": "Current Transmitter",
+   "principal": false,
+   "idWinCC": "21",
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CTA": {
+   "label": "Centrale de traitement de l'air (Chauffage clim cabine)",
+   "labelEn": "Air Handling Unit",
+   "principal": true,
+   "idWinCC": "311",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "CYL": {
+   "label": "Vérin",
+   "labelEn": "Cylinder",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DECO": {
+   "label": "Coffret de décolmatage pneumatique",
+   "labelEn": "Filter cleaning - pneumatic",
+   "principal": true,
+   "idWinCC": "321",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DESA": {
+   "label": "Filtre dépousiéreur",
+   "labelEn": "Dust Filter with cabinet",
+   "principal": true,
+   "idWinCC": "331",
+   "symbole": null,
+   "etat": "FAT en cours",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DI": {
+   "label": "Carte d'entrées automate",
+   "labelEn": "Digital inputs card",
+   "principal": false,
+   "idWinCC": "611",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DIS": {
+   "label": "Carte d'entrées automate de sécurité",
+   "labelEn": "Digital input safety card",
+   "principal": false,
+   "idWinCC": "631",
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DO": {
+   "label": "Carte de sorties digitale",
+   "labelEn": "Digital outputs card",
+   "principal": false,
+   "idWinCC": "621",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DOBO": {
+   "label": "Trémie Doseuse Ouvreuse de sac",
+   "labelEn": "Dosing Bunker with Bag Opener",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO",
+    "HORN"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Débit",
+     "unit": "t/h",
+     "default": 10
+    }
+   ]
+  },
+  "DOBU": {
+   "label": "Trémie doseuse",
+   "labelEn": "Dosing bunker",
+   "principal": true,
+   "idWinCC": "341",
+   "symbole": null,
+   "etat": "FAT en cours",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO",
+    "HORN",
+    "WT"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Débit",
+     "unit": "t/h",
+     "default": 10
+    }
+   ]
+  },
+  "DOS": {
+   "label": "Carte de sorties de sécurité",
+   "labelEn": "Digital safety outputs card",
+   "principal": false,
+   "idWinCC": "641",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DRBR": {
+   "label": "Résistance de freinage",
+   "labelEn": "Breaking resistor",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DRIV": {
+   "label": "Variateur de vitesse de moteurs asynchrones",
+   "labelEn": "Variable Speed Drive",
+   "principal": false,
+   "idWinCC": "31",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "commande",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "DRBR"
+   ],
+   "hs": [
+    {
+     "id": "SiemensG120C",
+     "label": "Siemens G120C",
+     "profinet": true,
+     "safetyTwin": "FBS_G120C"
+    },
+    {
+     "id": "SewDfc",
+     "label": "SEW DFC",
+     "profinet": true
+    },
+    {
+     "id": "SewMovimot",
+     "label": "SEW Movimot"
+    }
+   ]
+  },
+  "DRYA": {
+   "label": "Secheur d'air par adsorbtion",
+   "labelEn": "Adsorption air dryer",
+   "principal": true,
+   "idWinCC": "351",
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "PS",
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "DRYR": {
+   "label": "Sécheur d'air frigorifique",
+   "labelEn": "Refrigerated air dryer",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "PS",
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "EDCU": {
+   "label": "Séparateur à courant de Foucault",
+   "labelEn": "Eddy Current Separator",
+   "principal": true,
+   "idWinCC": "261",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse roue",
+     "unit": "tr/min",
+     "default": 2800
+    },
+    {
+     "name": "Vitesse bande",
+     "unit": "m/min",
+     "default": 90
+    }
+   ]
+  },
+  "EI": {
+   "label": "Module d'affichage d'énergie",
+   "labelEn": "Energy indicator",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "ENCO": {
+   "label": "Codeur",
+   "labelEn": "Encoder",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "ESTO": {
+   "label": "Arrêt d'urgence coup de poing",
+   "labelEn": "Emergency Stop Button",
+   "principal": false,
+   "idWinCC": "41",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "securite",
+   "superiors": [],
+   "options": [],
+   "hs": [],
+   "safetyHs": "FB_SafetyInput_Esto"
+  },
+  "ET": {
+   "label": "Mesure d'énergie. Permet également de mesurer le courant.",
+   "labelEn": "Energy Transmitter",
+   "principal": false,
+   "idWinCC": "471",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "ETS": {
+   "label": "Ethernet swich unmanaged",
+   "labelEn": "Switch ethernet non mangeable",
+   "principal": false,
+   "idWinCC": "591",
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "ETSM": {
+   "label": "Ethernet switch manageed",
+   "labelEn": "Switch ethernet manageable",
+   "principal": false,
+   "idWinCC": "601",
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "FAN": {
+   "label": "Ventilateur",
+   "labelEn": "Fan",
+   "principal": true,
+   "idWinCC": "241",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse",
+     "unit": "tr/min",
+     "default": 1450
+    }
+   ]
+  },
+  "FIEX": {
+   "label": "Séparateur de films",
+   "labelEn": "Films extract",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "Programmation en cours",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "FISE": {
+   "label": "Système de détection incendie",
+   "labelEn": "Fire detection system",
+   "principal": false,
+   "idWinCC": "501",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "FT": {
+   "label": "Transmetteur de débit",
+   "labelEn": "Flow transmitter",
+   "principal": false,
+   "idWinCC": "481",
+   "symbole": null,
+   "etat": "Programmation en cours",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "GAHD": {
+   "label": "Mesure de haute de couche double",
+   "labelEn": "Gantry double Height measurment",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "GES": {
+   "label": "Poignée homme mort",
+   "labelEn": "Grip enabling switch",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "GRAN": {
+   "label": "Granulateur",
+   "labelEn": "Granulator",
+   "principal": true,
+   "idWinCC": "581",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "HATC": {
+   "label": "Trappe d'accès",
+   "labelEn": "Hatch",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "HMI": {
+   "label": "IHM",
+   "labelEn": "HMI",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "HORN": {
+   "label": "Klaxon",
+   "labelEn": "Horn",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "IOPN": {
+   "label": "Module d'entrées/sorties",
+   "labelEn": "ModuleIOProfinet",
+   "principal": false,
+   "idWinCC": "571",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "JB": {
+   "label": "Boite de jonction",
+   "labelEn": "Junction Box",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "KA": {
+   "label": "Relais Auxiliaire",
+   "labelEn": "Auxiliary Relay",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "KAU": {
+   "label": "Relais de Sécurité",
+   "labelEn": "Safety Relay",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "KEY": {
+   "label": "Clé prisonnière",
+   "labelEn": "Trapped Key",
+   "principal": false,
+   "idWinCC": "671",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "KM": {
+   "label": "Contacteur de puissance",
+   "labelEn": "Contactor Simple",
+   "principal": false,
+   "idWinCC": "51",
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": true,
+   "role": "commande",
+   "superiors": [
+    "QM"
+   ],
+   "options": [
+    "CT"
+   ],
+   "hs": [
+    {
+     "id": "SchneiderLc1d",
+     "label": "Schneider LC1D"
+    }
+   ]
+  },
+  "KMIN": {
+   "label": "Contacteur de puissance inverseur",
+   "labelEn": "Contactor Inverser",
+   "principal": false,
+   "idWinCC": "61",
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": true,
+   "role": "commande",
+   "superiors": [
+    "QM"
+   ],
+   "options": [
+    "CT"
+   ],
+   "hs": [
+    {
+     "id": "SchneiderLc2d",
+     "label": "Schneider LC2D"
+    }
+   ]
+  },
+  "LICU": {
+   "label": "Barrière immatérielle",
+   "labelEn": "Light curtain",
+   "principal": false,
+   "idWinCC": "691",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "securite",
+   "superiors": [],
+   "options": [],
+   "hs": [],
+   "safetyHs": "FB_SafetyInput_LightCurtain"
+  },
+  "LIGH": {
+   "label": "Voyant/Verrine",
+   "labelEn": "Light",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "LIPR": {
+   "label": "Parafoudre",
+   "labelEn": "Lightning protection",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "LOCR": {
+   "label": "Télécommande de pilotage local",
+   "labelEn": "Télécommande pilotage local",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "LS": {
+   "label": "Détecteur de niveau TOR",
+   "labelEn": "Level switch",
+   "principal": false,
+   "idWinCC": "491",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "LT": {
+   "label": "Mesure de hauteur",
+   "labelEn": "Level Transmitter",
+   "principal": false,
+   "idWinCC": "71",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "SickUm30",
+     "label": "Sick UM30"
+    }
+   ]
+  },
+  "LUBS": {
+   "label": "Electrovanne de graissage",
+   "labelEn": "Lubrication solenoid valve",
+   "principal": false,
+   "idWinCC": "81",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "MAGP": {
+   "label": "Poulie magnétique",
+   "labelEn": "Magnetic Pulley",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "MASY": {
+   "label": "Moteur asynchrone sans réducteur",
+   "labelEn": "Asynchronous Motor",
+   "principal": false,
+   "idWinCC": "361",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": false,
+   "role": "moteur",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "MFAN": {
+   "label": "Ventilation forcée",
+   "labelEn": "Motor cooling fan",
+   "principal": false,
+   "idWinCC": "521",
+   "symbole": null,
+   "etat": "AF/AO en cours",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [
+    "KM",
+    "KMIN"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "MIST": {
+   "label": "Système de brumisation",
+   "labelEn": "Misting System",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "MOBR": {
+   "label": "Frein sur moteur",
+   "labelEn": "Motor Brake",
+   "principal": false,
+   "idWinCC": "371",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [
+    "KM"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "MODE": {
+   "label": "Modem",
+   "labelEn": "Modem",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "MRAS": {
+   "label": "Motoréducteur asynchrone",
+   "labelEn": "Asynchronous Gear Motor",
+   "principal": false,
+   "idWinCC": "91",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": false,
+   "role": "moteur",
+   "superiors": [
+    "KM",
+    "KMIN",
+    "DRIV",
+    "SOFT",
+    "SWDI"
+   ],
+   "options": [
+    "TH"
+   ],
+   "hs": [
+    {
+     "id": "SewDrn",
+     "label": "SEW DRN"
+    }
+   ]
+  },
+  "MRS": {
+   "label": "Motoréducteur synchrone",
+   "labelEn": "Synchronous gearmotor",
+   "principal": false,
+   "idWinCC": "101",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": false,
+   "role": "moteur",
+   "superiors": [
+    "DRIV"
+   ],
+   "options": [
+    "SWDI"
+   ],
+   "hs": [
+    {
+     "id": "SewDrc",
+     "label": "SEW DRC"
+    }
+   ]
+  },
+  "NB": {
+   "label": "Coffret réseau",
+   "labelEn": "Network box",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "Programmation en cours",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "NS": {
+   "label": "Prise réseau",
+   "labelEn": "Network socket",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": null,
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "OPCI": {
+   "label": "Analyseur de PCI",
+   "labelEn": "PCI Analyzer",
+   "principal": true,
+   "idWinCC": "731",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "OPSO": {
+   "label": "Trieur Optique",
+   "labelEn": "Optical Sorter",
+   "principal": true,
+   "idWinCC": "121",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO",
+    "SG"
+   ],
+   "hs": [
+    {
+     "id": "PellencMistral",
+     "label": "Pellenc Mistral+",
+     "profinet": true
+    },
+    {
+     "id": "TomraAutosort",
+     "label": "Tomra Autosort",
+     "profinet": true
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Recette",
+     "unit": "n",
+     "default": 1
+    }
+   ]
+  },
+  "OVCA": {
+   "label": "Overband à électro-aimant avec armoire locale",
+   "labelEn": "Overband electro with electrical cabinet",
+   "principal": true,
+   "idWinCC": "281",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "ESTO",
+    "SG"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "OVPM": {
+   "label": "Overband à aimant permanent - Sans armoire locale",
+   "labelEn": "Overband without cabinet",
+   "principal": true,
+   "idWinCC": "271",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS",
+    "DRIV"
+   ],
+   "options": [
+    "ESTO",
+    "SG"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "P": {
+   "label": "Pupitre",
+   "labelEn": "Pannel",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [],
+   "options": [
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PB": {
+   "label": "Bouton poussoir",
+   "labelEn": "Push button",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PC": {
+   "label": "Contrôleur de pression",
+   "labelEn": "Pressure controler",
+   "principal": false,
+   "idWinCC": "381",
+   "symbole": null,
+   "etat": "Programmation en cours",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PCI": {
+   "label": "Analyseur PCI",
+   "labelEn": "PCI analysator",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PD": {
+   "label": "Répartiteur de puissance",
+   "labelEn": "Power divider",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PHON": {
+   "label": "Téléphone",
+   "labelEn": "Phone",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PI": {
+   "label": "Carte mesure de puissance",
+   "labelEn": "Power input card",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PLC": {
+   "label": "API",
+   "labelEn": "PLC",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PLEN": {
+   "label": "Plenum de ventilation",
+   "labelEn": "Ventilation plenum",
+   "principal": true,
+   "idWinCC": "391",
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "POI": {
+   "label": "Onduleur",
+   "labelEn": "Power inverter",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "POSU": {
+   "label": "Alimentation 24vdc",
+   "labelEn": "Power supply",
+   "principal": false,
+   "idWinCC": "561",
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PRBA": {
+   "label": "Presse à balles",
+   "labelEn": "Baling Press",
+   "principal": true,
+   "idWinCC": "401",
+   "symbole": null,
+   "etat": "FAT en cours",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Recette",
+     "unit": "n",
+     "default": 1
+    }
+   ]
+  },
+  "PRBR": {
+   "label": "Presse à briquetter",
+   "labelEn": "Briquetting Press",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PRPA": {
+   "label": "Presse à paquets",
+   "labelEn": "Packet Press",
+   "principal": true,
+   "idWinCC": "411",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PS": {
+   "label": "Pressure sensor TOR",
+   "labelEn": "Pressostat TOR",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PSVE": {
+   "label": "Electrovanne pneumatique",
+   "labelEn": "Pneumatic Solenoid Valve",
+   "principal": false,
+   "idWinCC": "711",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PT": {
+   "label": "Mesure de pression",
+   "labelEn": "Pressure transmitter",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "FAT en cours",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "Q": {
+   "label": "Disjoncteur",
+   "labelEn": "Circuit Breaker",
+   "principal": false,
+   "idWinCC": "211",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": false,
+   "role": "protection",
+   "superiors": [],
+   "options": [
+    "ET"
+   ],
+   "hs": [
+    {
+     "id": "SchneiderC60",
+     "label": "Schneider C60"
+    }
+   ]
+  },
+  "QKMI": {
+   "label": "Contacteur inverseur - Protection thermique + fusible",
+   "labelEn": "Reversing starter - Electronic overload protection",
+   "principal": false,
+   "idWinCC": "651",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "commande",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "QM": {
+   "label": "Disjoncteur magnéto-thermique moteur",
+   "labelEn": "Motor Circuit Breaker",
+   "principal": false,
+   "idWinCC": "111",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": false,
+   "role": "protection",
+   "superiors": [],
+   "options": [
+    "ET"
+   ],
+   "hs": [
+    {
+     "id": "SchneiderGv2",
+     "label": "Schneider GV2"
+    },
+    {
+     "id": "Siemens3RV",
+     "label": "Siemens Sirius 3RV"
+    }
+   ]
+  },
+  "RAD": {
+   "label": "Chauffage radian",
+   "labelEn": "Radian heater",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "REMA": {
+   "label": "Antenne Télécommande Radio",
+   "labelEn": "Radio Remote Antemna",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "REMC": {
+   "label": "Chargeur Télécommande Radio",
+   "labelEn": "Radio Remote Charger",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "REMO": {
+   "label": "Télécommande",
+   "labelEn": "Remote",
+   "principal": true,
+   "idWinCC": "461",
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "REMR": {
+   "label": "Récepteur Télécommande Radio",
+   "labelEn": "Radio Remote Receiver",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "REMT": {
+   "label": "Émetteur Télécommande Radio",
+   "labelEn": "Radio Remote Transmitter",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "ROBO": {
+   "label": "Robot",
+   "labelEn": "Robot",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "ROUS": {
+   "label": "Rouleau séparatrice",
+   "labelEn": "Separating roller",
+   "principal": true,
+   "idWinCC": "141",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "ROVA": {
+   "label": "Écluse rotative",
+   "labelEn": "Rotary valve",
+   "principal": true,
+   "idWinCC": "221",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "RS": {
+   "label": "Capteur de rotation",
+   "labelEn": "Rotation Sensor",
+   "principal": false,
+   "idWinCC": "131",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "RSW": {
+   "label": "Commutateur",
+   "labelEn": "Rotatory Switch",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "S": {
+   "label": "Silo sans  pesage sans porte",
+   "labelEn": "Silo without weighing, without door",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": null,
+   "aSaisir": false,
+   "role": "matiere",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "SC": {
+   "label": "Câblette d'arrêt d'urgence",
+   "labelEn": "Safety cable",
+   "principal": false,
+   "idWinCC": "551",
+   "symbole": null,
+   "etat": "Programmation en cours",
+   "aSaisir": true,
+   "role": "securite",
+   "superiors": [],
+   "options": [],
+   "hs": [],
+   "safetyHs": "FB_SafetyInput_Cable"
+  },
+  "SCD3": {
+   "label": "Crible à disque avec 3 variateurs",
+   "labelEn": "Screen disc with 3 drive",
+   "principal": true,
+   "idWinCC": "151",
+   "symbole": null,
+   "etat": "Programmation en cours",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS"
+   ],
+   "options": [
+    "ESTO",
+    "SG"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse étage 1",
+     "unit": "tr/min",
+     "default": 90
+    },
+    {
+     "name": "Vitesse étage 2",
+     "unit": "tr/min",
+     "default": 90
+    },
+    {
+     "name": "Vitesse étage 3",
+     "unit": "tr/min",
+     "default": 90
+    }
+   ]
+  },
+  "SCDI": {
+   "label": "Crible à disque",
+   "labelEn": "Discs screen",
+   "principal": true,
+   "idWinCC": "421",
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse",
+     "unit": "tr/min",
+     "default": 90
+    }
+   ]
+  },
+  "SCRE": {
+   "label": "Vis sans fin",
+   "labelEn": "Worm screw",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse",
+     "unit": "tr/min",
+     "default": 40
+    }
+   ]
+  },
+  "SCVI": {
+   "label": "Crible vibrant",
+   "labelEn": "Vibrating Screen",
+   "principal": true,
+   "idWinCC": "541",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "SG": {
+   "label": "Gâche de sécurité sans interverrouillage électrique",
+   "labelEn": "Safety gate without locking",
+   "principal": false,
+   "idWinCC": "161",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "securite",
+   "superiors": [],
+   "options": [
+    "LIGH"
+   ],
+   "hs": [],
+   "safetyHs": "FB_SafetyInput_Gate"
+  },
+  "SGL": {
+   "label": "Gâche de sécurité avec interverrouillage électrique",
+   "labelEn": "Safety gate with electric locking",
+   "principal": false,
+   "idWinCC": "681",
+   "symbole": null,
+   "etat": null,
+   "aSaisir": true,
+   "role": "securite",
+   "superiors": [],
+   "options": [
+    "LIGH",
+    "PB"
+   ],
+   "hs": [],
+   "safetyHs": "FB_SafetyInput_GateLock"
+  },
+  "SHRE": {
+   "label": "Broyeur",
+   "labelEn": "Shredder",
+   "principal": true,
+   "idWinCC": "171",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "SMFI": {
+   "label": "Smart Filter",
+   "labelEn": "Smart Filter",
+   "principal": true,
+   "idWinCC": "531",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "SG",
+    "ESTO"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "SO": {
+   "label": "Prise de courant",
+   "labelEn": "Socket outlet",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": null,
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "SOFT": {
+   "label": "Démarreur",
+   "labelEn": "Soft Starter",
+   "principal": false,
+   "idWinCC": "431",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "commande",
+   "superiors": [
+    "Q"
+   ],
+   "options": [
+    "CT"
+   ],
+   "hs": [
+    {
+     "id": "Siemens3RW",
+     "label": "Siemens Sirius 3RW"
+    }
+   ]
+  },
+  "SW": {
+   "label": "Interrupteur",
+   "labelEn": "Switch",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": null,
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "SWDD": {
+   "label": "Silo pesé avec double porte",
+   "labelEn": "Weighed Silo Double Door",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "SWDI": {
+   "label": "Interrupteur sectionneur",
+   "labelEn": "Switch Disconnector",
+   "principal": false,
+   "idWinCC": "181",
+   "symbole": null,
+   "etat": "SAT ok",
+   "aSaisir": true,
+   "role": "commande",
+   "superiors": [
+    "KM",
+    "DRIV",
+    "KMIN",
+    "SOFT"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "SchneiderVcf",
+     "label": "Schneider VCF"
+    }
+   ]
+  },
+  "SWSD": {
+   "label": "Silo pesé avec une simple porte",
+   "labelEn": "Extractor Weighed Silo Single Door",
+   "principal": true,
+   "idWinCC": "251",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "SWSG": {
+   "label": "Silo gravitaire",
+   "labelEn": "Gravity Weighed Silo",
+   "principal": false,
+   "idWinCC": "191",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "T": {
+   "label": "Transformateur",
+   "labelEn": "Transformer",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "TBF": {
+   "label": "Alimentateur covoyeur",
+   "labelEn": "Tumble Back Feeder",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse",
+     "unit": "m/min",
+     "default": 12
+    }
+   ]
+  },
+  "TELR": {
+   "label": "Télérupteur",
+   "labelEn": "Teleruptor",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "AF/AO en cours",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "TH": {
+   "label": "Relais thermique",
+   "labelEn": "Thermical relay",
+   "principal": false,
+   "idWinCC": "441",
+   "symbole": null,
+   "etat": "FAT ok",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "TR": {
+   "label": "Régulateur/Afficheur de température",
+   "labelEn": "Temperature regulator/sensor",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "TROM": {
+   "label": "Trommel",
+   "labelEn": "Rotating Drum Screen",
+   "principal": true,
+   "idWinCC": "451",
+   "symbole": null,
+   "etat": "Programmation en cours",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "MRAS",
+    "MRS"
+   ],
+   "options": [
+    "RS",
+    "SG",
+    "SGL"
+   ],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ],
+   "setpoints": [
+    {
+     "name": "Vitesse",
+     "unit": "tr/min",
+     "default": 12
+    }
+   ]
+  },
+  "TUSO": {
+   "label": "Turbo Sorter",
+   "labelEn": "Turbo Sorter",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "UC": {
+   "label": "Ordinateur",
+   "labelEn": "Computer",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "UCTC": {
+   "label": "Client léger",
+   "labelEn": "Thin client",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "UT": {
+   "label": "Transmetteur de tension",
+   "labelEn": "Voltage transmitter",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "VT": {
+   "label": "Capteur de vibration",
+   "labelEn": "Vibrating Transmitter",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "WIRE": {
+   "label": "Câbles",
+   "labelEn": "Wire",
+   "principal": false,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "NA",
+   "aSaisir": false,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "WRAP": {
+   "label": "Enrubanneuse",
+   "labelEn": "",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "matiere",
+   "superiors": [
+    "Q"
+   ],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "WT": {
+   "label": "Transmetteur de pesage",
+   "labelEn": "Weighing Transmitter",
+   "principal": false,
+   "idWinCC": "201",
+   "symbole": null,
+   "etat": "FAT en cours",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "MettlerPfk",
+     "label": "Mettler PFK",
+     "profinet": true
+    }
+   ]
+  },
+  "ZS": {
+   "label": "Capteur de position",
+   "labelEn": "Switch position",
+   "principal": false,
+   "idWinCC": "511",
+   "symbole": null,
+   "etat": "FAT en cours",
+   "aSaisir": true,
+   "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "ZSS": {
+   "label": "Capteur de position de sécurité",
+   "labelEn": "Safety position sensor",
+   "principal": false,
+   "idWinCC": "701",
+   "symbole": null,
+   "etat": "A coder",
+   "aSaisir": true,
+   "role": "securite",
+   "superiors": [],
+   "options": [],
+   "hs": [],
+   "safetyHs": "FB_SafetyInput_Position"
+  }
+ },
+ "noAction": [
+  "C",
+  "P"
+ ],
+ "prefixes": {
+  "BELT": "08",
+  "TBF": "08",
+  "SCRE": "08",
+  "OPSO": "13",
+  "TROM": "63",
+  "EDCU": "64",
+  "BYPA": "35",
+  "OVPM": "36",
+  "OVCA": "36",
+  "DOBO": "42",
+  "DOBU": "42",
+  "BS": "57",
+  "SCDI": "19",
+  "SCD3": "19",
+  "SCVI": "19",
+  "PRBA": "11",
+  "PRPA": "11",
+  "PRBR": "11",
+  "S": "21",
+  "SWSD": "21",
+  "FAN": "33",
+  "C": "AR",
+  "P": "PU"
+ },
+ "eqOptions": [
+  {
+   "id": "reverseAllowed",
+   "label": "Autoriser la marche arrière",
+   "type": "bool",
+   "default": false,
+   "rule": "reverse"
+  },
+  {
+   "id": "bypassType",
+   "label": "Type bypass (sens réglé en recette)",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "id": "bypassInterlocksAtStart",
+   "label": "Bypass des asservissements au démarrage",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "id": "startDelay",
+   "label": "Tempo de démarrage",
+   "type": "number",
+   "unit": "s",
+   "default": 2
+  }
+ ],
+ "baseDefaults": {
+  "command": "",
+  "cpu": "S7-1517",
+  "hs": {
+   "DRIV": "SiemensG120C",
+   "SOFT": "Siemens3RW",
+   "KM": "SchneiderLc1d",
+   "QM": "SchneiderGv2",
+   "Q": "SchneiderC60"
+  }
+ }
+}

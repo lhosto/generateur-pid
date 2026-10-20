@@ -1,0 +1,60 @@
+{
+  "_lisezmoi": "Compléments FICTIFS au catalogue, en attendant la Global Library (HS, interface du bloc EQ) et les listes SharePoint manquantes. La liste des HG elle-même est réelle : kit/sharepoint/Hardware Generic.csv.",
+  "roles": {
+    "moteur": ["MRAS", "MRS", "MASY"],
+    "commande": ["DRIV", "SOFT", "KM", "KMIN", "SWDI", "QKMI"],
+    "protection": ["Q", "QM"],
+    "securite": ["ESTO", "SC", "SG", "SGL", "LICU", "ZSS"]
+  },
+  "noAction": ["C", "P"],
+  "prefixes": {
+    "BELT": "08", "TBF": "08", "SCRE": "08", "OPSO": "13", "TROM": "63", "EDCU": "64", "BYPA": "35", "OVPM": "36", "OVCA": "36",
+    "DOBO": "42", "DOBU": "42", "BS": "57", "SCDI": "19", "SCD3": "19", "SCVI": "19", "PRBA": "11", "PRPA": "11", "PRBR": "11",
+    "S": "21", "SWSD": "21", "FAN": "33", "C": "AR", "P": "PU"
+  },
+  "setpoints": {
+    "BELT": [{ "name": "Vitesse", "unit": "m/min", "default": 30 }],
+    "TBF": [{ "name": "Vitesse", "unit": "m/min", "default": 12 }],
+    "SCRE": [{ "name": "Vitesse", "unit": "tr/min", "default": 40 }],
+    "OPSO": [{ "name": "Recette", "unit": "n", "default": 1 }],
+    "TROM": [{ "name": "Vitesse", "unit": "tr/min", "default": 12 }],
+    "EDCU": [{ "name": "Vitesse roue", "unit": "tr/min", "default": 2800 }, { "name": "Vitesse bande", "unit": "m/min", "default": 90 }],
+    "BS": [{ "name": "Vitesse", "unit": "tr/min", "default": 180 }],
+    "SCDI": [{ "name": "Vitesse", "unit": "tr/min", "default": 90 }],
+    "SCD3": [{ "name": "Vitesse étage 1", "unit": "tr/min", "default": 90 }, { "name": "Vitesse étage 2", "unit": "tr/min", "default": 90 }, { "name": "Vitesse étage 3", "unit": "tr/min", "default": 90 }],
+    "FAN": [{ "name": "Vitesse", "unit": "tr/min", "default": 1450 }],
+    "DOBU": [{ "name": "Débit", "unit": "t/h", "default": 10 }],
+    "DOBO": [{ "name": "Débit", "unit": "t/h", "default": 10 }],
+    "PRBA": [{ "name": "Recette", "unit": "n", "default": 1 }]
+  },
+  "hs": {
+    "DRIV": [
+      { "id": "SiemensG120C", "label": "Siemens G120C", "profinet": true, "safetyTwin": "FBS_G120C" },
+      { "id": "SewDfc", "label": "SEW DFC", "profinet": true },
+      { "id": "SewMovimot", "label": "SEW Movimot" }
+    ],
+    "SOFT": [{ "id": "Siemens3RW", "label": "Siemens Sirius 3RW" }],
+    "KM": [{ "id": "SchneiderLc1d", "label": "Schneider LC1D" }],
+    "KMIN": [{ "id": "SchneiderLc2d", "label": "Schneider LC2D" }],
+    "SWDI": [{ "id": "SchneiderVcf", "label": "Schneider VCF" }],
+    "QM": [{ "id": "SchneiderGv2", "label": "Schneider GV2" }, { "id": "Siemens3RV", "label": "Siemens Sirius 3RV" }],
+    "Q": [{ "id": "SchneiderC60", "label": "Schneider C60" }],
+    "MRAS": [{ "id": "SewDrn", "label": "SEW DRN" }],
+    "MRS": [{ "id": "SewDrc", "label": "SEW DRC" }],
+    "OPSO": [{ "id": "PellencMistral", "label": "Pellenc Mistral+", "profinet": true }, { "id": "TomraAutosort", "label": "Tomra Autosort", "profinet": true }],
+    "LT": [{ "id": "SickUm30", "label": "Sick UM30" }],
+    "WT": [{ "id": "MettlerPfk", "label": "Mettler PFK", "profinet": true }]
+  },
+  "safetyHs": { "ESTO": "FB_SafetyInput_Esto", "SC": "FB_SafetyInput_Cable", "SG": "FB_SafetyInput_Gate", "SGL": "FB_SafetyInput_GateLock", "LICU": "FB_SafetyInput_LightCurtain", "ZSS": "FB_SafetyInput_Position" },
+  "eqOptions": [
+    { "id": "reverseAllowed", "label": "Autoriser la marche arrière", "type": "bool", "default": false, "rule": "reverse" },
+    { "id": "bypassType", "label": "Type bypass (sens réglé en recette)", "type": "bool", "default": false },
+    { "id": "bypassInterlocksAtStart", "label": "Bypass des asservissements au démarrage", "type": "bool", "default": false },
+    { "id": "startDelay", "label": "Tempo de démarrage", "type": "number", "unit": "s", "default": 2 }
+  ],
+  "baseDefaults": {
+    "command": "",
+    "cpu": "S7-1517",
+    "hs": { "DRIV": "SiemensG120C", "SOFT": "Siemens3RW", "KM": "SchneiderLc1d", "QM": "SchneiderGv2", "Q": "SchneiderC60" }
+  }
+}

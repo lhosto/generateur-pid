@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "editeur-pid",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "C:/Users/lhospital/dev/generateur-pid/editeur", "--", "--port", "5173", "--strictPort"],
+      "port": 5173
+    }
+  ]
+}

@@ -1,0 +1,153 @@
+/* Habillage : tokens ABI (AbiDesign/tokens, couleurs relevées sur les écrans de production). */
+/* Aktid ABI — colors sampled from production HMI screens */
+:root{
+/* Neutrals (dark HMI) */
+--abi-gray-950:#191919;
+--abi-gray-900:#343233;
+--abi-gray-850:#3c3c3c;
+--abi-gray-800:#414141;
+--abi-gray-750:#424242;
+--abi-gray-700:#4c4c4c;
+--abi-gray-650:#464846;
+--abi-gray-600:#5a605c;
+--abi-gray-550:#5e5e5e;
+--abi-gray-500:#687a72;
+--abi-gray-400:#8a8f8c;
+--abi-gray-300:#acacac;
+--abi-gray-200:#c4c8c6;
+--abi-white:#ffffff;
+/* Brand */
+--abi-green:#06d06e;
+--abi-green-bright:#00e296;
+--abi-green-glow:#00ef9d;
+--abi-green-deep:#305a46;
+--abi-teal:#00747e;
+--abi-teal-light:#0c88a0;
+--abi-sage:#88a496;
+--abi-lime:#9cce00;
+/* Status */
+--abi-orange:#dc8c40;
+--abi-orange-text:#f0962e;
+--abi-red:#dc413f;
+--abi-red-alarm:#e53150;
+--abi-steel:#7a91a4;
+/* Tinted button fills */
+--abi-tint-blue:#3c4c5c;
+--abi-tint-brown:#5c4c3c;
+--abi-tint-red:#5c3a3e;
+--abi-tint-green:#305a46;
+
+/* Semantic */
+--surface-page:var(--abi-gray-850);
+--surface-panel:var(--abi-gray-850);
+--surface-panel-header:var(--abi-gray-600);
+--surface-nav:var(--abi-gray-750);
+--surface-nav-active:var(--abi-gray-600);
+--surface-rail:var(--abi-gray-800);
+--surface-pid:var(--abi-gray-600);
+--surface-input:var(--abi-gray-850);
+--surface-segment:var(--abi-gray-600);
+--border-nav:var(--abi-gray-550);
+--border-input:var(--abi-gray-300);
+--border-divider:var(--abi-gray-600);
+--grid-line:var(--abi-gray-650);
+--text-primary:var(--abi-white);
+--text-secondary:var(--abi-gray-200);
+--text-muted:var(--abi-gray-400);
+--text-disabled:var(--abi-gray-500);
+--text-accent:var(--abi-green);
+--text-warning:var(--abi-orange-text);
+--status-running:var(--abi-green);
+--status-active:var(--abi-lime);
+--status-warning:var(--abi-orange);
+--status-alarm:var(--abi-red);
+--status-stopped:var(--abi-gray-300);
+--chart-flow:var(--abi-green-bright);
+--chart-mass:var(--abi-white);
+--chart-production:var(--abi-green-bright);
+--chart-break:var(--abi-teal);
+--chart-planned:var(--abi-sage);
+--pid-node:var(--abi-gray-300);
+--pid-node-dark:var(--abi-gray-700);
+--pid-node-active:var(--abi-lime);
+--pid-line:#1e1e1e;
+--pid-equipment:var(--abi-steel);
+}
+:root{
+--space-1:2px;--space-2:4px;--space-3:6px;--space-4:8px;--space-5:10px;--space-6:12px;--space-7:16px;--space-8:20px;--space-9:24px;
+--radius-none:0;--radius-xs:2px;--radius-sm:3px;--radius-md:4px;--radius-lg:6px;--radius-pill:999px;
+--header-h:92px;--rail-w:84px;--nav-btn:74px;--panel-head-h:44px;
+--shadow-none:none;
+--shadow-drawer:-4px 0 12px rgba(0,0,0,.45);
+--shadow-pid:0 1px 0 rgba(0,0,0,.35);
+--dur-fast:120ms; 
+--ease-std:cubic-bezier(.2,0,0,1); 
+}
+:root{
+--font-sans:Arial,"Helvetica Neue",Helvetica,sans-serif;
+--font-serif:"Times New Roman",Times,serif;
+--font-mono:"Roboto Mono",Consolas,monospace;
+--fw-regular:400; 
+--fw-medium:500; 
+--fw-bold:700; 
+--fs-micro:10px;
+--fs-label:11px;
+--fs-small:12px;
+--fs-body:14px;
+--fs-ui:15px;
+--fs-title:16px;
+--fs-value:18px;
+--fs-value-lg:20px;
+--fs-user:20px;
+--lh-tight:1.15; 
+--lh-body:1.35; 
+/* Semantic */
+--type-panel-title:var(--fw-bold) var(--fs-title)/var(--lh-tight) var(--font-sans);
+--type-nav-label:var(--fw-bold) var(--fs-label)/1.1 var(--font-sans);
+--type-body:var(--fw-regular) var(--fs-body)/var(--lh-body) var(--font-sans);
+--type-axis:var(--fw-regular) var(--fs-micro)/1 var(--font-sans);
+--type-value:var(--fw-bold) var(--fs-value)/1 var(--font-sans);
+}
+
+/* Canevas PID : synoptique SCADA 2026 (planche Symboles). Gris = normal, pas de couleur d'état en édition. */
+:root{
+--pid-bg:#565d59;
+--pid-out:#2b302e;
+--pid-tile:#3b4340;
+--pid-card:#2f3634;
+--pid-band:#2d3330;
+--pid-chute:#2a302d;
+--pid-stroke:#98a29c;
+--pid-stroke-card:#aab4ad;
+--pid-stroke-light:#d3d8d3;
+--pid-stroke-diamond:#c9cec9;
+--pid-picto:#aab4ad;
+--pid-divider:#7d8781;
+--pid-text:#eef1ee;
+--pid-text-dim:#b9c2bc;
+--pid-caption:#c9d0cb;
+--pid-fault:#a83a31;
+--pid-fault-stroke:#ff9a90;
+--pid-warn:#efb04a;
+--pid-select:var(--abi-green);
+--font-tag:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+/* Couleur de lien par type de sortie : PROPOSITION à valider (docs/05-points-ouverts.md). */
+--out-1:#d3d8d3;
+--out-2:#6db4e6;
+--out-3:#efb04a;
+--out-4:#ea6d63;
+--out-5:#b59be6;
+--out-6:#7fd1b9;
+}
+
+html,body,#root{height:100%}
+body.abi{background:var(--surface-page);color:var(--text-primary);font:var(--type-body);margin:0;-webkit-font-smoothing:antialiased;overflow:hidden}
+body.abi *{box-sizing:border-box}
+button{font:inherit;color:inherit}
+input,select{font:400 14px var(--font-sans)}
+::selection{background:var(--abi-green-deep)}
+.mono{font-family:var(--font-tag)}
+.abi-btn:hover:not(:disabled),.abi-row:hover{filter:brightness(1.18)}
+.abi-tr:hover td{background:#444}
+.abi-link:hover{text-decoration:underline}
+button:focus-visible,input:focus-visible,select:focus-visible,[draggable]:focus-visible{outline:2px solid var(--abi-green);outline-offset:1px}
