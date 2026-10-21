@@ -257,6 +257,19 @@ function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], other
     [s, p1, [p2[0], p1[1]], p2, t],
     [s, p1, [p1[0], p2[1]], p2, t],
   ];
+  // Coude au plus près de l'arrivée (20 px avant l'équipement) ; place prise → recul par pas de 10 px
+  // vers le départ. Même règle partout : l'écart entre traits voisins est toujours un multiple de 10.
+  const dx = Math.sign(p2[0] - p1[0]) || 1;
+  const dy = Math.sign(p2[1] - p1[1]) || 1;
+  for (let k = 1; k <= 40; k++) {
+    const x = p2[0] - dx * k * 10;
+    const y = p2[1] - dy * k * 10;
+    if ((x - p1[0]) * dx >= 0) tries.push([s, p1, [x, p1[1]], [x, p2[1]], p2, t]);
+    if ((y - p1[1]) * dy >= 0) tries.push([s, p1, [p1[0], y], [p2[0], y], p2, t]);
+  }
+  // Dernier recours avant le reste : coude 10 px seulement avant l'arrivée (approche courte).
+  tries.push([s, p1, [p2[0] + dx * 10, p1[1]], [p2[0] + dx * 10, p2[1]], p2, t]);
+  tries.push([s, p1, [p1[0], p2[1] + dy * 10], [p2[0], p2[1] + dy * 10], p2, t]);
   const mx = Math.round((p1[0] + p2[0]) / 20) * 10 + Math.round(bias);
   const my = Math.round((p1[1] + p2[1]) / 20) * 10 + Math.round(bias);
   for (const off of offsets(240)) {
