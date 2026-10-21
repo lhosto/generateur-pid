@@ -3,6 +3,7 @@
 // l'aimantation propose les mêmes positions pendant un glisser.
 import { eqBox, isHorizontal, overlaps, sideOffset, type Box } from './geometry';
 import type { Dir, Eq, Flow, Pivot } from './pivot';
+import { dockKind } from './dock';
 import { arrivalSide, departureSide, portOffset } from './route';
 
 interface Edge {
@@ -20,11 +21,14 @@ interface Edge {
  * même axe ; sinon (départ en bas, arrivée à gauche…) rien à aligner.
  */
 function relation(a: Eq, ab: Box, chA: number, dir: Dir, b: Eq, bb: Box, chB: number, num = 1): { axis: 'x' | 'y'; offA: number; offB: number } | null {
-  const sSide: Flow = departureSide(a, dir);
+  // Machine posée sur un tapis (hors valoriste) : la sortie part du côté du tapis où est l'équipement relié,
+  // en travers du tapis (son sens du flux est déjà en travers).
+  const auto = !!a.dockedTo && dockKind(a.hg[0]?.type ?? '') !== 'flank';
+  const sSide: Flow = auto ? (isHorizontal(a.flow) ? (bb.cx < ab.cx ? 'W' : 'E') : bb.cy < ab.cy ? 'N' : 'S') : departureSide(a, dir);
   const tSide: Flow = arrivalSide(b, ab, bb);
   if (isHorizontal(sSide) !== isHorizontal(tSide)) return null;
   // Départ propre à la sortie (décalé quand le canal a plusieurs sorties).
-  return { axis: isHorizontal(sSide) ? 'y' : 'x', offA: sideOffset(a, sSide, chA) + portOffset(a, ab, chA, dir, num), offB: sideOffset(b, tSide, chB) };
+  return { axis: isHorizontal(sSide) ? 'y' : 'x', offA: sideOffset(a, sSide, chA) + (auto ? 0 : portOffset(a, ab, chA, dir, num)), offB: sideOffset(b, tSide, chB) };
 }
 
 /**

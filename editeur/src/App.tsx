@@ -8,7 +8,7 @@ import { readEmbeddedCatalogue } from './model/catalogue';
 import { boxAt, CHUTE_SIZE, eqBox, SCREEN } from './model/geometry';
 import { activeStandard, addEq, deleteItems, duplicate, emptyPivot, findEq, moveItems, removeLink, removeOutput, setBase, setPositions } from './model/ops';
 import type { Pivot } from './model/pivot';
-import { incompleteReasons } from './model/rules';
+import { canRemoveOutput, incompleteReasons } from './model/rules';
 import { loadSaved, usePivotHistory } from './model/store';
 import { straighten } from './model/straighten';
 import { reorganize } from './model/layout';
@@ -173,7 +173,11 @@ export function App() {
 
   const deleteSelection = () => {
     if (sel.link) commit(removeLink(pivot, sel.link));
-    else if (sel.stub) commit(removeOutput(pivot, sel.stub));
+    else if (sel.stub) {
+      // Dernière sortie d'un canal : obligatoire (sauf stockage).
+      const e = pivot.equipments.find((x) => x.id === sel.stub!.eq);
+      if (e && canRemoveOutput(e, sel.stub.ch, sel.stub.dir)) commit(removeOutput(pivot, sel.stub));
+    }
     else if (sel.eqs.length || sel.chutes.length) {
       commit(deleteItems(pivot, sel.eqs, sel.chutes));
       if (drawer && sel.eqs.includes(drawer)) setDrawer(null);

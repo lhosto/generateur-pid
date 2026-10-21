@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import catJson from '../catalogue.json';
 import type { Catalogue } from './catalogue';
-import { addChannel, addEq, emptyPivot, findEq, moveItems, removeChannel, removeOutput } from './ops';
+import { addChannel, addEq, addOutput, connect, emptyPivot, findEq, moveItems, removeChannel, removeOutput } from './ops';
 import { cover, coverage, dockedLinks, dockedNumsFree, dockedOn, dockLinkTo, dockOnDrop, settleDocked, swapDocked, touching, uncover } from './dock';
 import { eqBox, type Box } from './geometry';
 import type { Pivot } from './pivot';
@@ -64,7 +64,11 @@ describe('overband accolé au convoyeur', () => {
   });
   it('le tapis s’allonge vers l’aval : même épaisseur, même entrée', () => {
     const before = eqBox(addEq(cat, emptyPivot(cat), 'BELT', 300, 300).p.equipments[0]);
-    const { p, c } = setup();
+    let { p, c } = setup();
+    for (const hg0 of ['ROBO', 'PICK', 'PICK']) {
+      const m = addEq(cat, p, hg0, 305, hg0 === 'PICK' ? 260 : 300);
+      p = dockOnDrop(m.p, m.id);
+    }
     const after = box(p, c);
     expect(after.h).toBe(before.h);
     expect(after.x0).toBeCloseTo(before.x0);
@@ -74,12 +78,12 @@ describe('overband accolé au convoyeur', () => {
     const { p, c, m } = setup();
     expect(box(p, m).x1).toBeCloseTo(box(p, c).x1);
   });
-  it('overband accolé : la sortie principale du canal devient 1− (le joint est 1+)', () => {
+  it('overband accolé : rien n’est écrit sur les sorties du tapis', () => {
     const { p, c } = setup(2);
     const e = findEq(p, c)!;
-    expect(shortTag(e, 1, 1, 'avant')).toBe('1−');
-    expect(shortTag(e, 2, 1, 'avant')).toBe('2−');
-    expect(shortTag(e, 1, 2, 'avant')).toBe('1+');
+    // La représentation suffit : les sorties du tapis gardent leur nom ordinaire.
+    expect(shortTag(e, 1, 1, 'avant')).toBe('');
+    expect(shortTag(e, 2, 1, 'avant')).toBe('');
   });
   it('canal 1 du tapis supprimé : l’overband reste relié (canal 1), toujours accolé', () => {
     const { p, c, m } = setup(2);
@@ -95,7 +99,7 @@ describe('overband accolé au convoyeur', () => {
     const dl = q.links.find((l) => l.from.eq === c && l.to.eq === m)!;
     expect(dl.from.num).toBeGreaterThan(1);
     expect(findEq(q, c)!.channels[0].outputs.some((o) => o.num === 1 && !o.docked)).toBe(true);
-    expect(shortTag(findEq(q, c)!, 1, 1, 'avant')).toBe('1−');
+    expect(shortTag(findEq(q, c)!, 1, 1, 'avant')).toBe('');
   });
   it('lâché loin : pas accolé', () => {
     let p = emptyPivot(cat);
@@ -116,7 +120,7 @@ describe('valoriste (PICK)', () => {
     expect(touching(box(p, c.id), box(p, m.id))).toBe(true);
     expect(p.links.filter((l) => l.to.eq === m.id).map((l) => l.from.ch)).toEqual([1]);
   });
-  it('canal ajouté au tapis : le valoriste du dessous passe sur le nouveau dernier canal (2+), plus rien sur le canal 1', () => {
+  it('canal ajouté au tapis : le valoriste du dessous passe sur le nouveau dernier canal, plus rien sur le canal 1', () => {
     const c = belt(1);
     const m = addEq(cat, c.p, 'PICK', 305, 350);
     let p = dockOnDrop(m.p, m.id);
@@ -124,7 +128,7 @@ describe('valoriste (PICK)', () => {
     p = settleDocked(addChannel(p, c.id));
     expect(p.links.filter((l) => l.to.eq === m.id).map((l) => l.from.ch)).toEqual([2]);
     expect(findEq(p, c.id)!.channels[0].outputs.some((o) => o.docked)).toBe(false);
-    expect(shortTag(findEq(p, c.id)!, 2, 2, 'avant')).toBe('2+');
+
   });
   it('dessous → dernier canal', () => {
     const c = belt(3);
@@ -162,7 +166,7 @@ describe('machines de tête et robots', () => {
 });
 
 describe('machine accolée supprimée', () => {
-  it('sa sortie disparaît du tapis : il reste 1−, 1+, 1++ (pas de 1.4 en attente)', () => {
+  it('sa sortie disparaît du tapis : il reste 3 sorties (pas de 1.4 en attente)', () => {
     let p = addEq(cat, emptyPivot(cat), 'BELT', 300, 300).p;
     const c = p.equipments[0].id;
     const ids: string[] = [];
@@ -175,7 +179,7 @@ describe('machine accolée supprimée', () => {
     p = settleDocked({ ...p, equipments: p.equipments.filter((e) => e.id !== gone), links: p.links.filter((l) => l.to.eq !== gone) });
     const e = findEq(p, c)!;
     expect(e.channels[0].outputs.map((o) => o.num).sort()).toEqual([1, 2, 3]);
-    expect([1, 2, 3].map((n) => shortTag(e, 1, n, 'avant'))).toEqual(['1−', '1+', '1++']);
+
   });
 });
 
@@ -192,11 +196,19 @@ describe('raccordement des canaux tapis → machine posée dessus', () => {
     const { p, c, m } = twoCh();
     expect(map(p, c, m)).toEqual([[1, 1], [2, 2]]);
   });
-  it('trait du canal 2 du tapis vers le canal 1 de la machine : le joint change d’arrivée, rien de créé', () => {
+  it('même nombre de canaux : gauche dans gauche, imposé (un trait 2 → 1 est remis en 2 → 2)', () => {
     const { p, c, m } = twoCh();
-    const q = dockLinkTo(p, c, 2, m, 1);
-    expect(map(q, c, m)).toEqual([[1, 1], [2, 1]]);
+    const q = settleDocked(dockLinkTo(p, c, 2, m, 1));
+    expect(map(q, c, m)).toEqual([[1, 1], [2, 2]]);
     expect(q.links.length).toBe(p.links.length);
+  });
+  it('machine à 2 canaux sur un tapis à 3 : le choix fait à la main est gardé', () => {
+    let p = addEq(cat, emptyPivot(cat), 'BELT', 300, 300, { channels: 3 }).p;
+    const c = p.equipments[0].id;
+    const m = addEq(cat, p, 'OPSO', 305, 300, { channels: 2 });
+    p = dockOnDrop(m.p, m.id);
+    const q = settleDocked(dockLinkTo(p, c, 3, m.id, 1));
+    expect(map(q, c, m.id).find(([k]) => k === 3)).toEqual([3, 1]);
   });
   it('geste répété depuis la sortie principale : jamais de sortie en plus (pas de création à l’infini)', () => {
     const { p, c, m } = twoCh();
@@ -276,5 +288,84 @@ describe('valoriste posé avant la mémoire du côté', () => {
     p = settleDocked({ ...p, equipments: p.equipments.map((e) => (e.id === c.id ? { ...e, flow: 'N' as const } : e)) });
     expect(p.links.filter((l) => l.to.eq === m.id).map((l) => l.from.ch)).toEqual([1]);
     expect(findEq(p, m.id)!.dockSide).toBe('left');
+  });
+});
+
+describe('glisser une machine posée sur le tapis', () => {
+  it('le valoriste lâché avant le robot passe avant lui ; lâché de l’autre côté, il change de canal', () => {
+    let p = addEq(cat, emptyPivot(cat), 'BELT', 300, 300, { channels: 2 }).p;
+    const c = p.equipments[0].id;
+    const r = addEq(cat, p, 'ROBO', 305, 300);
+    p = dockOnDrop(r.p, r.id);
+    const k = addEq(cat, p, 'PICK', 305, 260);
+    p = dockOnDrop(k.p, k.id);
+    expect(box(p, k.id).cx).toBeGreaterThan(box(p, r.id).cx);
+    // Glissé en amont du robot.
+    const moved = { ...p, equipments: p.equipments.map((e) => (e.id === k.id ? { ...e, x: box(p, r.id).x0 - 30 } : e)) };
+    p = dockOnDrop(moved, k.id);
+    expect(box(p, k.id).cx).toBeLessThan(box(p, r.id).cx);
+    // Glissé sous le tapis : canal 2 (côté droit du flux).
+    const below = { ...p, equipments: p.equipments.map((e) => (e.id === k.id ? { ...e, y: box(p, c).y1 + 10 } : e)) };
+    p = dockOnDrop(below, k.id);
+    expect(p.links.filter((l) => l.to.eq === k.id).map((l) => l.from.ch)).toEqual([2]);
+  });
+  it('robot réduit à un canal puis déplacé : il garde son seul canal', () => {
+    let p = addEq(cat, emptyPivot(cat), 'BELT', 300, 300, { channels: 3 }).p;
+    const r = addEq(cat, p, 'ROBO', 305, 300);
+    p = uncover(uncover(dockOnDrop(r.p, r.id), r.id, 1), r.id, 2);
+    const moved = { ...p, equipments: p.equipments.map((e) => (e.id === r.id ? { ...e, x: e.x - 5 } : e)) };
+    p = dockOnDrop(moved, r.id);
+    expect(p.links.filter((l) => l.to.eq === r.id).map((l) => l.from.ch)).toEqual([3]);
+  });
+});
+
+describe('place libre le long du tapis', () => {
+  it('valoriste de droite glissé à la hauteur de celui de gauche : il s’y aligne, ses liens ne changent pas', () => {
+    let p = addEq(cat, emptyPivot(cat), 'BELT', 300, 300, { channels: 2 }).p;
+    const c = p.equipments[0].id;
+    const drop = (y: number) => {
+      const m = addEq(cat, p, 'PICK', 305, y);
+      p = dockOnDrop(m.p, m.id);
+      return m.id;
+    };
+    const left = drop(250);
+    drop(250);
+    const r1 = drop(350);
+    const r2 = drop(350);
+    const before = p.links.filter((l) => l.to.eq === r2).map((l) => [l.from.ch, l.from.num]);
+    const target = box(p, left).cx;
+    const moved = { ...p, equipments: p.equipments.map((e) => (e.id === r1 ? { ...e, x: target } : e)) };
+    p = dockOnDrop(moved, r1);
+    expect(box(p, r1).cx).toBeCloseTo(target, 0);
+    expect(p.links.filter((l) => l.to.eq === r2).map((l) => [l.from.ch, l.from.num])).toEqual(before);
+    expect(box(p, c).x0).toBeLessThanOrEqual(box(p, r1).x0);
+  });
+});
+
+describe('robot vers des goulottes des deux côtés', () => {
+  it('chaque sortie part du côté du tapis où est l’équipement relié (automatique)', () => {
+    let p = addEq(cat, emptyPivot(cat), 'BELT', 300, 300).p;
+    const r = addEq(cat, p, 'ROBO', 305, 300);
+    p = dockOnDrop(r.p, r.id);
+    const up = findEq(p, r.id)!.flow;
+    const a = addEq(cat, p, 'BELT', 300, 150);
+    const b = addEq(cat, a.p, 'BELT', 300, 450);
+    p = connect(b.p, { eq: r.id, ch: 1, dir: 'avant', num: 1 }, { eq: a.id, ch: 1 });
+    p = connect(addOutput(p, r.id, 1, 'avant').p, { eq: r.id, ch: 1, dir: 'avant', num: 2 }, { eq: b.id, ch: 1 });
+    void up;
+    const rb = box(p, r.id);
+    const start = (to: string) => routeAll(p).links.find((l) => l.link.from.eq === r.id && l.link.to.eq === to)!.points[0];
+    expect(start(a.id)[1]).toBeLessThan(rb.cy);
+    expect(start(b.id)[1]).toBeGreaterThan(rb.cy);
+  });
+});
+
+describe('machine de séparation posée sur un tapis', () => {
+  it('une seule sortie (positive) : le négatif est le tapis qui continue', () => {
+    let p = addEq(cat, emptyPivot(cat), 'BELT', 300, 300).p;
+    const o = addEq(cat, p, 'OPSO', 305, 300);
+    expect(findEq(o.p, o.id)!.channels[0].outputs).toHaveLength(2);
+    p = dockOnDrop(o.p, o.id);
+    expect(findEq(p, o.id)!.channels[0].outputs).toHaveLength(1);
   });
 });

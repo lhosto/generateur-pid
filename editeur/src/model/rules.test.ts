@@ -11,7 +11,7 @@ import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, dup
 import type { Pivot } from './pivot';
 import { arMark, loopLinks, routeAll, shortTag, tagFor } from './route';
 import {
-  canAddOutput, defaultStack, hgName, hsName, incompleteReasons, isFirstChannel, MAX, nextOutputNum, reverseBlocked, suggestRepere,
+  canAddOutput, canRemoveOutput, defaultStack, hgName, hsName, incompleteReasons, isFirstChannel, MAX, nextOutputNum, reverseBlocked, suggestRepere,
 } from './rules';
 
 const cat = catJson as unknown as Catalogue;
@@ -179,8 +179,9 @@ describe('traits alignés (axes de canal)', () => {
     expect(new Set(q.equipments.map((e) => e.y)).size).toBe(1);
     expect(routeAll(q).links[0].points).toHaveLength(2);
   });
-  it('aligne un tapis sur l’axe du canal 1 d’un trieur tricanal, le trieur ne bouge pas', () => {
-    const { p, a, b } = linked('BELT', [300, 290], 'OPSO', [500, 300], { chB: 1, nB: 3 });
+  // Équipement tricanal à une sortie par canal (un trieur naît avec − et + : il prendrait plus de place).
+  it('aligne un tapis sur l’axe du canal 1 d’un broyeur tricanal, le broyeur ne bouge pas', () => {
+    const { p, a, b } = linked('BELT', [300, 290], 'SHRE', [500, 300], { chB: 1, nB: 3 });
     const q = straighten(p);
     expect(findEq(q, b)!.y).toBe(300);
     expect(findEq(q, a)!.y).toBe(280);
@@ -195,7 +196,7 @@ describe('traits alignés (axes de canal)', () => {
     expect(straighten(n.p, new Set([n.a])).equipments.find((e) => e.id === n.a)!.y).toBe(110);
   });
   it('le geste « + » pose l’EQ suivant sur l’axe du canal', () => {
-    const t = addEq(cat, emptyPivot(cat), 'OPSO', 300, 300, { channels: 3 });
+    const t = addEq(cat, emptyPivot(cat), 'SHRE', 300, 300, { channels: 3 });
     const r = addOutputWithNext(cat, t.p, t.id, 3, 'avant', 'BELT');
     expect(findEq(r.p, r.id!)!.y).toBe(320);
     expect(routeAll(r.p).links[0].points).toHaveLength(2);
@@ -342,7 +343,7 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     expect(pts[pts.length - 1][1]).toBe(box.y1);
     expect(pts[pts.length - 2][1]).toBeGreaterThan(box.y1);
   });
-  it('étiquette : rien pour une sortie unique, numéro seul si besoin', () => {
+  it('étiquette : rien hors séparation (le dessin suffit) ; séparation : − / +', () => {
     const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
     const e = findEq(a.p, a.id)!;
     expect(shortTag(e, 1, 1, 'avant')).toBe('');
@@ -357,7 +358,8 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     expect(shortTag(sep, 1, 1, 'avant')).toBe('−');
     expect(shortTag(sep, 1, 2, 'avant')).toBe('+');
     const ch2 = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }] }, { outputs: [{ dir: 'avant' as const, num: 1 }] }] };
-    expect(shortTag(ch2, 2, 1, 'avant')).toBe('2');
+    // Convoyeur à plusieurs canaux : rien non plus.
+    expect(shortTag(ch2, 2, 1, 'avant')).toBe('');
     const mix = { ...sep, channels: [two.channels[0], ch2.channels[1]] };
     expect(shortTag(mix, 1, 2, 'avant')).toBe('1+');
     // Plusieurs canaux : le canal, ou canal.sortie si ce canal a plusieurs sorties.
@@ -646,9 +648,12 @@ describe('largeur propre à chaque canal', () => {
     expect(mk(1)).toBeLessThan(mk(3));
   });
   it('une sortie par canal : axes tous les 20 px (convoyeur : 28, canaux plus larges)', () => {
-    const a = addEq(cat, emptyPivot(cat), 'OPSO', 100, 100, { channels: 3 });
+    const a = addEq(cat, emptyPivot(cat), 'SHRE', 100, 100, { channels: 3 });
     const e = findEq(a.p, a.id)!;
     expect([1, 2, 3].map((k) => sideOffset(e, 'E', k))).toEqual([-20, 0, 20]);
+    // Machine de séparation : − et + dès la création.
+    const o = addEq(cat, emptyPivot(cat), 'OPSO', 100, 100);
+    expect(findEq(o.p, o.id)!.channels[0].outputs.map((x) => x.num)).toEqual([1, 2]);
     const b = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { channels: 3 });
     expect([1, 2, 3].map((k) => sideOffset(findEq(b.p, b.id)!, 'E', k))).toEqual([-28, 0, 28]);
   });
@@ -720,5 +725,17 @@ describe('arrivée droite sur un équipement collé', () => {
 describe('« AR » sur le trait', () => {
   it('sur le trait, au milieu du plus long segment', () => {
     expect(arMark([[0, 0], [0, 20], [100, 20], [100, 30]])).toEqual({ x: 50, y: 20, anchor: 'middle' });
+  });
+});
+
+describe('sortie obligatoire', () => {
+  it('dernière sortie d’un canal : pas supprimable, sauf stockage ; une deuxième, oui', () => {
+    const b = addEq(cat, emptyPivot(cat), 'BELT', 100, 100);
+    const belt = findEq(b.p, b.id)!;
+    expect(canRemoveOutput(belt, 1, 'avant')).toBe(false);
+    const two = addOutput(b.p, b.id, 1, 'avant').p;
+    expect(canRemoveOutput(findEq(two, b.id)!, 1, 'avant')).toBe(true);
+    const s = addEq(cat, emptyPivot(cat), 'S', 100, 100);
+    expect(canRemoveOutput(findEq(s.p, s.id)!, 1, 'avant')).toBe(true);
   });
 });

@@ -4,7 +4,7 @@ import { getLang, tx } from '../i18n';
 import type { BaseSettings, Catalogue, EqOptionDef, HgTypeDef, HsDef } from './catalogue';
 import { hg0Of } from './geometry';
 import { uid, type Dir, type Eq, type Hg, type Pivot, type Setpoint } from './pivot';
-import { isSeparation } from './symbols';
+import { isSeparation, symbolOf } from './symbols';
 
 export const MAX = { channels: 3, outputs: 6, setpoints: 4, hg: 23 };
 
@@ -135,6 +135,18 @@ export function reverseBlocked(eq: Eq): string | null {
   return null;
 }
 
+/**
+ * Une sortie peut-elle être supprimée ? La matière doit toujours pouvoir sortir : la dernière sortie avant
+ * d'un canal est obligatoire, sauf en fin de ligne (stockage : silo, bac…) et hors flux matière (divers).
+ * Une sortie arrière se supprime toujours.
+ */
+export function canRemoveOutput(eq: Eq, ch: number, dir: Dir): boolean {
+  if (dir === 'arriere') return true;
+  const g = symbolOf(hg0Of(eq)).group;
+  if (g === 'Stockage' || g === 'Divers' || g === 'Sans symbole') return true;
+  return outputsOf(eq, ch, 'avant').length > 1;
+}
+
 export function outputsOf(eq: Eq, ch: number, dir: Dir) {
   return (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir).sort((a, b) => a.num - b.num);
 }
@@ -159,7 +171,8 @@ export function canAddOutput(eq: Eq, ch: number, dir: Dir): boolean {
   return nextOutputNum(eq, ch, dir) !== null;
 }
 
-export const canAddChannel = (eq: Eq) => eq.channels.length < MAX.channels;
+/** Ajout de canal possible : jusqu'à MAX.channels ; un valoriste (poste de tri manuel) n'a qu'un canal. */
+export const canAddChannel = (eq: Eq) => eq.channels.length < (hg0Of(eq) === 'PICK' ? 1 : MAX.channels);
 
 /**
  * Type d'une sortie. Hors machine de séparation (convoyeur…) : toujours « principale » (deux sorties
@@ -168,11 +181,18 @@ export const canAddChannel = (eq: Eq) => eq.channels.length < MAX.channels;
  */
 export const polarity = (num: number, count = 2, separation = true) =>
   tx(count <= 1 || !separation ? L.main : num === 1 ? L.negative : L.positive);
+
+/**
+ * Type d'une sortie d'un équipement. Machine posée sur un convoyeur : elle ne fait que du picking,
+ * toutes ses sorties sont positives (l'ordre ne compte pas). Sinon, voir polarity.
+ */
+export const outputPolarity = (eq: Eq | undefined, ch: number, dir: Dir, num: number) =>
+  eq?.dockedTo ? tx(L.positive) : polarity(num, eq ? outputsOf(eq, ch, dir).length : 1, isSeparation(eq?.hg[0]?.type ?? ''));
 export const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** Étiquette d'une sortie : repère · CH01 · S1 · sens · polarité (CH01 et S1 sont des noms, non traduits). */
 export function outputLabel(eq: Eq, ch: number, dir: Dir, num: number): string {
-  return `${eq.repere || '?'} · CH${pad2(ch)} · S${num} · ${tx(dir === 'avant' ? L.forward : L.reverse)} · ${polarity(num, outputsOf(eq, ch, dir).length, isSeparation(eq.hg[0]?.type ?? ''))}`;
+  return `${eq.repere || '?'} · CH${pad2(ch)} · S${num} · ${tx(dir === 'avant' ? L.forward : L.reverse)} · ${outputPolarity(eq, ch, dir, num)}`;
 }
 
 /** First channel : coché automatiquement si aucune sortie n'arrive dans le canal. */

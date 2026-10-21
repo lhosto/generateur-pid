@@ -21,6 +21,11 @@ export interface Output {
   num: number;
   /** Sortie vers un overband / une poulie accolé : pas de trait, ni place de départ, ni largeur de canal. */
   docked?: boolean;
+  /**
+   * Sortie qui part du côté opposé au sens du flux de l'équipement (robot posé sur un tapis qui alimente
+   * des goulottes des deux côtés). Ce n'est pas une marche arrière.
+   */
+  flip?: boolean;
 }
 
 export interface Channel {
@@ -56,6 +61,10 @@ export interface Eq {
   len?: number;
   /** Valoriste accolé : côté du tapis, par rapport au sens du flux (gauche = côté du canal 1). */
   dockSide?: 'left' | 'right';
+  /** Machine posée sur un tapis : côté où s'écrit son repère (à l'écran), choisi dans sa fiche. */
+  labelSide?: 'left' | 'right' | 'top' | 'bottom';
+  /** Machine accolée déplacée à la main : place choisie le long du tapis (centre, depuis son entrée). */
+  dockAt?: number;
   /** Machine accolée : taille de son cartouche (dessin seulement, recalculée). */
   dockSize?: { w: number; h: number };
 }

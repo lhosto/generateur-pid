@@ -26,12 +26,12 @@ export const dockKind = (hg0: string): DockKind => (FLANK.has(hg0) ? 'flank' : H
 /** Distance de dépôt en dessous de laquelle une machine accolable se colle au convoyeur voisin. */
 const DOCK_REACH = 24;
 /** Cartouche d'une machine accolée : longueur le long du flux (la même pour toutes). */
-export const CART = 36;
+export const CART = 28;
 /** Épaisseur du cartouche d'un valoriste (hors du tapis). */
-const FLANK_T = 28;
+const FLANK_T = 24;
 /** Écart entre deux machines ; bout du tapis sans machine de tête. */
-const GAP = 8;
-const TAIL = 14;
+const GAP = 4;
+const TAIL = 8;
 
 const hg0 = (e: Eq) => e.hg[0]?.type ?? '';
 /** Largeur d'un joint (numéro « 1.2 », « 2+→2 »…). */
@@ -313,6 +313,8 @@ interface Placed {
   /** Début (repère compris) le long du tapis, depuis l'entrée. */
   left: number;
   lab: number;
+  /** Ressources occupées le long du tapis (flanc, canaux). */
+  rs: string[];
 }
 
 /**
@@ -342,13 +344,21 @@ function layoutBelt(p: Pivot, conv: Eq): { conv: Eq; machines: Eq[] } {
     const r = chs.map(rank);
     return Math.min(...r) === 0 || Math.max(...r) !== n - 1;
   };
+  // Sortie d'une machine superposée : du côté choisi (sens du flux réglé dans sa fiche, en travers du
+  // tapis) ; à défaut, vers le flanc le plus proche.
+  const exitOf = (m: Eq, chs: number[]) => {
+    // Repère choisi : la sortie (et son « + ») part du côté opposé.
+    const ls = labelSideOf(m, conv.flow);
+    if (m.labelSide && ls === m.labelSide) return ls === 'right' || ls === 'bottom';
+    return isHorizontal(m.flow) !== isHorizontal(conv.flow) ? m.flow === 'N' || m.flow === 'W' : exitNeg(chs);
+  };
   const res = (it: (typeof items)[number]): string[] => {
     if (it.kind === 'flank') return [sideOf(conv, it.m)];
     const r = it.chs.map(rank);
     const lo = Math.min(...r), hi = Math.max(...r);
     const own = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
-    const crossed = exitNeg(it.chs) ? Array.from({ length: lo }, (_, i) => i) : Array.from({ length: n - 1 - hi }, (_, i) => hi + 1 + i);
-    const sides = [...(lo === 0 ? ['neg'] : []), ...(hi === n - 1 ? ['pos'] : []), exitNeg(it.chs) ? 'neg' : 'pos'];
+    const crossed = exitOf(it.m, it.chs) ? Array.from({ length: lo }, (_, i) => i) : Array.from({ length: n - 1 - hi }, (_, i) => hi + 1 + i);
+    const sides = [...(lo === 0 ? ['neg'] : []), ...(hi === n - 1 ? ['pos'] : []), exitOf(it.m, it.chs) ? 'neg' : 'pos'];
     const byRank = (rr: number) => `c${outer.neg === 1 ? rr + 1 : n - rr}`;
     return [...new Set([...own.map(byRank), ...crossed.map(byRank), ...sides])];
   };
@@ -357,8 +367,14 @@ function layoutBelt(p: Pivot, conv: Eq): { conv: Eq; machines: Eq[] } {
   // Tapis vertical : repères et joints (écrits à l'horizontale) ne prennent que leur hauteur le long du flux.
   const hor = isHorizontal(conv.flow);
   const labRoom = (m: Eq, kind: DockKind) =>
-    kind === 'flank' ? (hor ? textWidth(m.repere || '?') : FONT.tag) + 4 : (hor ? jointW : n > 1 ? 2 * jointH + 1 : jointH) + 4;
-  const headRoom = hor ? textWidth(conv.repere || '?') + 12 : FONT.tag + 10;
+    // Joints masqués (la représentation suffit). Machine superposée : son repère, écrit sous (ou sur) elle
+    // à l'horizontale, déborde du cartouche ; ce débord est réservé pour ne pas toucher la voisine.
+    // Valoriste : repère côté amont sur un tapis horizontal ; sur un tapis vertical, sur son côté
+    // extérieur (rien à réserver le long du flux).
+    // Tapis vertical : le repère du valoriste, remonté au-dessus de sa sortie, dépasse un peu de son cartouche.
+    kind === 'flank' ? (hor ? textWidth(m.repere || '?') + 3 : Math.max(0, 1.05 * FONT.tag - FLANK_T / 2) + 2) : hor ? Math.max(0, textWidth(m.repere || '?') - CART) : 0;
+  // Entrée du tapis : son repère, puis la place du « + » de pose (toujours libre).
+  const headRoom = (hor ? textWidth(conv.repere || '?') : FONT.tag) + 6 + 16;
 
   // Posées depuis le bout du tapis vers l'amont, dans l'ordre inverse des numéros : d'abord les machines
   // de tête (leur bord aval = bout du tapis), puis les autres juste avant elles (ou avant le bout).
@@ -372,7 +388,7 @@ function layoutBelt(p: Pivot, conv: Eq): { conv: Eq; machines: Eq[] } {
       const right = Math.min(limit, ...rs.map((r) => (from[r] ?? Infinity) - GAP));
       const left = right - room(lab);
       for (const r of rs) from[r] = left;
-      out.unshift({ m: it.m, kind: it.kind, chs: it.chs, left, lab });
+      out.unshift({ m: it.m, kind: it.kind, chs: it.chs, left, lab, rs });
     }
     return out;
   };
@@ -386,7 +402,27 @@ function layoutBelt(p: Pivot, conv: Eq): { conv: Eq; machines: Eq[] } {
   const shift = headRoom - first;
   for (const m of [...heads, ...placed]) m.left += shift;
   const base = isHorizontal(conv.flow) ? eqBoxNoLen(conv).w : eqBoxNoLen(conv).h;
-  const len = Math.max(base, shift);
+  let len = Math.max(base, shift);
+  // Tapis plus long que nécessaire (longueur minimale) : les machines restent serrées vers le bout.
+  for (const m of [...heads, ...placed]) m.left += len - shift;
+  // Place choisie à la main (machine glissée le long du tapis) : respectée, sans chevaucher une voisine
+  // et toujours avant les machines de bout (le tapis s'allonge si besoin). Les liens ne changent pas.
+  if (placed.some((m) => m.m.dockAt !== undefined)) {
+    const want = (m: Placed) => (m.m.dockAt !== undefined ? m.m.dockAt - m.lab - CART / 2 : m.left);
+    const end: Record<string, number> = {};
+    for (const m of [...placed].sort((a, b) => want(a) - want(b))) {
+      const min = m.kind === 'flank' ? headRoom - m.lab : headRoom;
+      m.left = Math.max(want(m), min, ...m.rs.map((r) => (end[r] ?? -Infinity) + GAP));
+      for (const r of m.rs) end[r] = m.left + m.lab + CART;
+    }
+    const bodyEnd = Math.max(...placed.map((m) => m.left + m.lab + CART));
+    const headLeft = heads.length ? Math.min(...heads.map((h) => h.left)) : len - TAIL + GAP;
+    const push = bodyEnd + GAP - headLeft;
+    if (push > 0) {
+      for (const h of heads) h.left += push;
+      len += push;
+    }
+  }
 
   // Le tapis garde son entrée : le centre se déplace de la moitié de l'allongement, vers l'aval.
   const old = eqBox(conv);
@@ -413,11 +449,12 @@ function layoutBelt(p: Pivot, conv: Eq): { conv: Eq; machines: Eq[] } {
       const edges = chs.map((k) => chEdges(newConv, k, t));
       let lo = Math.min(...edges.map((e) => e[0]));
       let hi = Math.max(...edges.map((e) => e[1]));
-      lo += kind === 'head' && lo <= -t / 2 + 0.5 ? 0 : 2;
-      hi -= kind === 'head' && hi >= t / 2 - 0.5 ? 0 : 2;
+      // Affleure le flanc du tapis quand elle couvre le canal extérieur (même largeur pour toutes).
+      lo += lo <= -t / 2 + 0.5 ? 0 : 2;
+      hi -= hi >= t / 2 - 0.5 ? 0 : 2;
       off = (lo + hi) / 2;
       thick = hi - lo;
-      const neg = exitNeg(chs);
+      const neg = exitOf(m, chs);
       out = isHorizontal(conv.flow) ? (neg ? 'N' : 'S') : neg ? 'W' : 'E';
     }
     const { dx, dy } = across(off);
@@ -496,6 +533,20 @@ export function settleDocked(p: Pivot): Pivot {
     if (l.from.num !== 1 || !dockedLinks(next).has(l.id)) continue;
     next = moveOffOne(next, l.id);
   }
+  // Raccordement automatique d'une machine superposée : à un canal, tous les canaux du tapis dans son
+  // canal 1 ; à autant de canaux que le tapis, gauche dans gauche… (k → k). Sinon, le choix fait à la main.
+  {
+    const fix = new Map<string, number>();
+    for (const l of next.links) {
+      const m = next.equipments.find((e) => e.id === l.to.eq);
+      if (!m || m.dockedTo !== l.from.eq || dockKind(hg0(m)) === 'flank') continue;
+      const conv = findEq(next, l.from.eq);
+      if (!conv) continue;
+      const want = m.channels.length < 2 ? 1 : m.channels.length === conv.channels.length ? l.from.ch : l.to.ch;
+      if (want !== l.to.ch) fix.set(l.id, want);
+    }
+    if (fix.size) next = { ...next, links: next.links.map((l): Link => (fix.has(l.id) ? { ...l, to: { ...l.to, ch: fix.get(l.id)! } } : l)) };
+  }
   // Toujours au moins un lien depuis son tapis : valoriste sur le canal de son côté, sinon canal 1.
   for (const m of next.equipments) {
     if (!m.dockedTo) continue;
@@ -555,7 +606,7 @@ export function dockOnDrop(p: Pivot, machId: string): Pivot {
   // Lâchée loin de tout convoyeur : elle n'est plus accolée (ses liens redeviennent des traits).
   if (!best) {
     if (!mach.dockedTo) return p;
-    let q = updateEq(p, machId, { dockedTo: undefined, dockSize: undefined, dockSide: undefined });
+    let q = updateEq(p, machId, { dockedTo: undefined, dockSize: undefined, dockSide: undefined, dockAt: undefined });
     for (const l of q.links) if (l.from.eq === mach.dockedTo && l.to.eq === machId) q = markDocked(q, l.from, false);
     return q;
   }
@@ -563,12 +614,82 @@ export function dockOnDrop(p: Pivot, machId: string): Pivot {
   const kind = dockKind(hg0(mach));
   // Valoriste : le côté où on le lâche est mémorisé par rapport au flux (il suit le tapis tourné).
   const side = screenSide(conv, mach);
+  const again = mach.dockedTo === conv.id;
   let next = updateEq(p, machId, kind === 'flank' ? { dockedTo: conv.id, dockSide: flowSide(conv, side) } : { dockedTo: conv.id });
+  // Posée sur le tapis : le négatif, c'est le tapis qui continue ; la machine ne garde qu'une sortie
+  // (positive). Les sorties en attente en trop (− et + d'une machine de séparation neuve) sont retirées.
+  if (!again) {
+    const m = findEq(next, machId)!;
+    const linked = (ch: number, num: number) => next.links.some((l) => l.from.eq === machId && l.from.ch === ch && l.from.dir === 'avant' && l.from.num === num);
+    m.channels.forEach((c, ci) => {
+      const fwd = c.outputs.filter((o) => o.dir === 'avant').sort((x, y) => y.num - x.num);
+      for (const o of fwd) {
+        const cur = findEq(next, machId)!.channels[ci].outputs.filter((x) => x.dir === 'avant').length;
+        if (cur > 1 && !linked(ci + 1, o.num)) next = removeOutput(next, { eq: machId, ch: ci + 1, dir: 'avant', num: o.num });
+      }
+    });
+  }
   const o = outerChannels(conv);
-  const want = kind === 'flank' ? [side === 'neg' ? o.neg : o.pos] : conv.channels.map((_, i) => i + 1);
+  // Déjà posée sur ce tapis : une machine superposée garde ses canaux (on l'a seulement déplacée) ; un
+  // valoriste passé de l'autre côté est rebranché au rangement.
+  const want = kind === 'flank' ? (again ? [] : [side === 'neg' ? o.neg : o.pos]) : again ? [] : conv.channels.map((_, i) => i + 1);
   for (const k of want) {
     if (next.links.some((l) => l.from.eq === conv.id && l.from.ch === k && l.to.eq === machId)) continue;
     next = linkDocked(next, conv.id, k, machId, defaultMachCh(findEq(next, machId)!, k));
   }
+  if (again) {
+    // Valoriste changé de côté : le rangement le rebranche sur le canal de ce côté avant de le classer.
+    next = settleDocked(next);
+    next = reorderByDrop(next, conv.id, machId, mach.x, mach.y);
+    // Place choisie : centre de la machine le long du tapis, depuis son entrée (machines de bout : au bout).
+    if (kind !== 'head') {
+      const cb = eqBox(findEq(next, conv.id)!);
+      const [vx, vy] = flowVec(conv.flow);
+      const len = isHorizontal(conv.flow) ? cb.w : cb.h;
+      const entry = { x: cb.cx - (vx * len) / 2, y: cb.cy - (vy * len) / 2 };
+      next = updateEq(next, machId, { dockAt: (mach.x - entry.x) * vx + (mach.y - entry.y) * vy });
+    }
+  }
   return settleDocked(next);
+}
+
+/**
+ * Machine glissée le long du tapis : elle prend sa place dans l'ordre d'après l'endroit où on l'a
+ * lâchée. Sur chacun de ses canaux, les numéros des machines de sa catégorie (corps ou tête : un
+ * valoriste ou un robot ne passe jamais après une machine de bout) sont redistribués dans l'ordre du flux.
+ */
+function reorderByDrop(p: Pivot, convId: string, machId: string, x: number, y: number): Pivot {
+  const conv = findEq(p, convId);
+  const mach = findEq(p, machId);
+  if (!conv || !mach) return p;
+  const along = (px: number, py: number) => (conv.flow === 'E' ? px : conv.flow === 'W' ? -px : conv.flow === 'S' ? py : -py);
+  const head = dockKind(hg0(mach)) === 'head';
+  const eqs = new Map(p.equipments.map((e) => [e.id, e]));
+  const remap = new Map<string, number>();
+  for (const k of new Set(machLinks(p, convId, machId).map((l) => l.from.ch))) {
+    const group = p.links.filter((l) => {
+      const m = eqs.get(l.to.eq);
+      return l.from.eq === convId && l.from.ch === k && l.from.dir === 'avant' && m?.dockedTo === convId && (dockKind(hg0(m)) === 'head') === head;
+    });
+    const pos = (l: Link) => (l.to.eq === machId ? along(x, y) : along(eqs.get(l.to.eq)!.x, eqs.get(l.to.eq)!.y));
+    const nums = group.map((l) => l.from.num).sort((a, b) => a - b);
+    [...group].sort((a, b) => pos(a) - pos(b)).forEach((l, i) => {
+      if (l.from.num !== nums[i]) remap.set(l.id, nums[i]);
+    });
+  }
+  if (!remap.size) return p;
+  return { ...p, links: p.links.map((l): Link => (remap.has(l.id) ? { ...l, from: { ...l.from, num: remap.get(l.id)! } } : l)) };
+}
+
+/**
+ * Côté du repère d'une machine superposée à un tapis : celui choisi dans sa fiche s'il convient au sens
+ * du tapis (gauche / droite d'un tapis vertical, dessus / dessous d'un tapis horizontal) ; sinon à
+ * l'opposé de sa sortie. Rien pour un valoriste (repère côté amont ou extérieur).
+ */
+export function labelSideOf(mach: Eq, beltFlow: Flow): 'left' | 'right' | 'top' | 'bottom' | null {
+  if (dockKind(hg0(mach)) === 'flank') return null;
+  const vertical = !isHorizontal(beltFlow);
+  const ok = vertical ? ['left', 'right'] : ['top', 'bottom'];
+  if (mach.labelSide && ok.includes(mach.labelSide)) return mach.labelSide;
+  return vertical ? (mach.flow === 'W' ? 'right' : 'left') : mach.flow === 'S' ? 'top' : 'bottom';
 }

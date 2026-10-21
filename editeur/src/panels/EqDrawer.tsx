@@ -3,20 +3,20 @@
 import type { ReactNode } from 'react';
 import { Abbr, getLang, hgLabel, plain, rich, Term, tx, type Entry } from '../i18n';
 import { etatLabel, principals, type Catalogue } from '../model/catalogue';
-import { hg0Of } from '../model/geometry';
+import { hg0Of, isHorizontal } from '../model/geometry';
+import { labelSideOf } from '../model/dock';
 import {
   addChannel, addOutput, addProximity, changeHg0, findEq, removeChannel, removeHg, removeOutput, setChainType, setHs, setLinkTarget, updateEq,
 } from '../model/ops';
 import type { Dir, Eq, Flow, Pivot } from '../model/pivot';
 import { outputColor } from '../model/route';
 import {
-  alternativesAt, canAddChannel, canAddOutput, chainOf, hgDef, hgName, hsLabel, hsName, incompleteReasons, isFirstChannel, isNoAction, MAX,
-  optionLabel, outputsOf, pad2, polarity, proximityChoices, proximityOf, repereUsers, reverseBlocked,
+  alternativesAt, canAddChannel, canAddOutput, canRemoveOutput, chainOf, hgDef, hgName, hsLabel, hsName, incompleteReasons, isFirstChannel, isNoAction, MAX,
+  optionLabel, outputPolarity, outputsOf, pad2, proximityChoices, proximityOf, repereUsers, reverseBlocked,
   freeOutputNum,
 } from '../model/rules';
 import { Button, Field, Icon, inputStyle, SectionHead, Toggle } from '../ui/ui';
 import { Glyph } from './Palette';
-import { isSeparation } from '../model/symbols';
 
 // Textes de la fiche (français / anglais). Les noms TIA (08Aa_Main, 08Aa_CH01), codes HG, repères,
 // numéros de sortie (S1), unités et noms de consignes sont des données : jamais traduits.
@@ -48,6 +48,11 @@ const L = {
     en: (id: string, etat: string) => `Sets the shape on the P&ID. WinCC ID ${id} · status ${etat}`,
   },
   flow: { fr: 'Sens du flux', en: 'Flow direction' },
+  labelSide: { fr: 'Repère affiché', en: 'Tag shown' },
+  labelTop: { fr: 'Au-dessus de la machine', en: 'Above the machine' },
+  labelBottom: { fr: 'Sous la machine', en: 'Below the machine' },
+  labelLeft: { fr: 'À gauche du tapis', en: 'Left of the belt' },
+  labelRight: { fr: 'À droite du tapis', en: 'Right of the belt' },
   right: { fr: 'Vers la droite', en: 'To the right' },
   down: { fr: 'Vers le bas', en: 'Downwards' },
   left: { fr: 'Vers la gauche', en: 'To the left' },
@@ -207,7 +212,27 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
         <Field label={tx(L.descriptif)}>
           <input aria-label={tx(L.descriptif)} value={eq.descriptif} onChange={(e) => set({ descriptif: e.target.value })} style={inputStyle} />
         </Field>
-        <Field label={tx(L.flow)}>
+        {/* Machine posée sur un tapis : son sens suit le tapis ; on choisit seulement le côté de son repère. */}
+        {eq.dockedTo && (() => {
+          const belt = pivot.equipments.find((e) => e.id === eq.dockedTo);
+          const cur = belt ? labelSideOf(eq, belt.flow) : null;
+          if (!belt || !cur) return null;
+          const opts = isHorizontal(belt.flow)
+            ? ([{ s: 'top', arrow: '↑', label: L.labelTop }, { s: 'bottom', arrow: '↓', label: L.labelBottom }] as const)
+            : ([{ s: 'left', arrow: '←', label: L.labelLeft }, { s: 'right', arrow: '→', label: L.labelRight }] as const);
+          return (
+            <Field label={tx(L.labelSide)}>
+              <span style={{ display: 'flex', gap: 4 }}>
+                {opts.map((o) => (
+                  <Button key={o.s} small active={cur === o.s} title={tx(o.label)} onClick={() => set({ labelSide: o.s, flow: o.s === 'left' ? 'E' : o.s === 'right' ? 'W' : o.s === 'top' ? 'S' : 'N' })} style={{ width: 36, fontSize: 16 }}>
+                    {o.arrow}
+                  </Button>
+                ))}
+              </span>
+            </Field>
+          );
+        })()}
+        {!eq.dockedTo && <Field label={tx(L.flow)}>
           <span style={{ display: 'flex', gap: 4 }}>
             {FLOWS.map((x) => (
               <Button key={x.f} small active={eq.flow === x.f} title={tx(x.label)} onClick={() => set({ flow: x.f })} style={{ width: 36, fontSize: 16 }}>
@@ -215,7 +240,7 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
               </Button>
             ))}
           </span>
-        </Field>
+        </Field>}
 
         {/* À droite de l'en-tête : en-tête de la colonne des sélecteurs HS, alignée sur la grille. */}
         <SectionHead title={<>{tx(L.stack)}<Abbr>HG</Abbr></>} right={<span style={{ display: 'inline-block', width: 174, textAlign: 'left' }}><Term k="hs" /></span>} />
@@ -370,7 +395,7 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
                                 <line x1={0} y1={4} x2={22} y2={4} stroke={outputColor(o.num)} strokeWidth={2} strokeDasharray={dir === 'arriere' ? '4 3' : undefined} />
                               </svg>
                               <span className="mono" style={{ width: 30, font: '600 12px var(--font-tag)' }}>{out}</span>
-                              <span style={{ width: 120, color: 'var(--text-secondary)' }}>{tx(dir === 'avant' ? L.forward : L.reverse)} · {polarity(o.num, outs.length, isSeparation(eq.hg[0]?.type ?? ''))}</span>
+                              <span style={{ width: 120, color: 'var(--text-secondary)' }}>{tx(dir === 'avant' ? L.forward : L.reverse)} · {outputPolarity(eq, ci + 1, dir, o.num)}</span>
                               {l ? (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <button type="button" onClick={() => onSelect(l.to.eq)} className="abi-link" title={tx(L.openTarget)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--abi-green)', font: '600 12px var(--font-tag)' }}>
@@ -390,7 +415,9 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
                               ) : (
                                 <span style={{ color: 'var(--pid-warn)' }}>{tx(L.unlinked)}</span>
                               )}
-                              <Button variant="ghost" small icon="x" title={tx(L.deleteOutput, out)} onClick={() => commit(removeOutput(pivot, { eq: eq.id, ch, dir, num: o.num }))} style={{ marginLeft: 'auto' }} />
+                              {canRemoveOutput(eq, ch, dir) && (
+                                <Button variant="ghost" small icon="x" title={tx(L.deleteOutput, out)} onClick={() => commit(removeOutput(pivot, { eq: eq.id, ch, dir, num: o.num }))} style={{ marginLeft: 'auto' }} />
+                              )}
                             </div>
                           );
                         })}

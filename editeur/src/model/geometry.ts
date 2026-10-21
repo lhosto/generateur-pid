@@ -79,7 +79,9 @@ export function eqBox(eq: Eq): Box {
   // tapis allongé pour loger ses machines accolées.
   const { w, h } = sizeOf(baseOf(eq), 1, eq.flow);
   const t = thickness(eq);
-  return isHorizontal(eq.flow) ? boxAt(eq.x, eq.y, eq.len ?? w, t) : boxAt(eq.x, eq.y, t, eq.len ?? h);
+  // Séparation à l'horizontale : assez longue pour son repère (côté entrée) et son marqueur (côté sorties).
+  const len = eq.len ?? (baseOf(eq) === 'flare' && isHorizontal(eq.flow) ? Math.max(w, textWidth(eq.repere || '?') + 36) : undefined);
+  return isHorizontal(eq.flow) ? boxAt(eq.x, eq.y, len ?? w, t) : boxAt(eq.x, eq.y, t, len ?? h);
 }
 
 /**

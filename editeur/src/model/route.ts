@@ -84,15 +84,18 @@ export function arMark(points: Pt[]): { x: number; y: number; anchor: 'start' | 
 
 export function shortTag(eq: Eq | undefined, ch: number, num: number, dir: Dir): string {
   if (!eq) return outputTag(ch, num, dir);
-  // Machines accolées sur ce canal : la sortie principale est « k− », les joints « k+ », « k++ » ; dès 4
-  // sorties « k.1(−) », « k.2 »… (règle des machines de séparation).
-  const outs = eq.channels[ch - 1]?.outputs ?? [];
-  if (outs.some((o) => o.dir === dir && o.docked)) {
-    const count = outs.filter((o) => o.dir === dir).length;
-    return count >= 4 ? `${ch}.${num}${num === 1 ? '(−)' : ''}` : `${ch}${num === 1 ? '−' : '+'.repeat(num - 1)}`;
-  }
-  const count = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir && !o.docked).length;
-  return tagFor(eq.channels.length, ch, num, count, dir, isSeparation(eq.hg[0]?.type ?? ''));
+  // Seules les machines de séparation nomment leurs sorties (−, +, ++) : ailleurs (tapis, trémie…) le
+  // dessin suffit, rien n'est écrit.
+  // Machine posée sur un convoyeur : du picking, toutes ses sorties sont positives, l'ordre ne compte
+  // pas : rien d'écrit non plus.
+  if (!isSeparation(eq.hg[0]?.type ?? '') || eq.dockedTo) return '';
+  // Machines posées sur le tapis : leur représentation suffit, les sorties du tapis gardent leur nom
+  // ordinaire (les sorties accolées ne comptent pas).
+  // Numérotées entre elles : 1.1, 1.2 même si 1.2 à 1.4 sont tenues par des machines posées dessus.
+  const outs = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir);
+  const own = outs.filter((o) => !o.docked).map((o) => o.num).sort((a, b) => a - b);
+  const shown = own.includes(num) ? own.indexOf(num) + 1 : num;
+  return tagFor(eq.channels.length, ch, shown, own.length, dir, isSeparation(eq.hg[0]?.type ?? ''));
 }
 
 export interface TagPos {
@@ -470,6 +473,13 @@ function routeLink(a: End, b: End, obstacles: Box[], sSide: Flow, tSide: Flow, p
 /** Côté de départ d'une sortie : côté aval du flux en marche avant, côté amont en marche arrière. */
 export const departureSide = (src: Eq, dir: Dir): Flow => (dir === 'avant' ? src.flow : opposite(src.flow));
 
+/** Sortie posée de l'autre côté de l'équipement (voir Output.flip). */
+const flipped = (e: Eq, ch: number, dir: Dir, num: number) => !!e.channels[ch - 1]?.outputs.find((o) => o.dir === dir && o.num === num)?.flip;
+
+/** Côté de départ d'une sortie : celui de son sens, ou l'opposé si elle a été changée de côté. */
+export const outSide = (e: Eq, ch: number, dir: Dir, num: number): Flow =>
+  flipped(e, ch, dir, num) ? opposite(departureSide(e, dir)) : departureSide(e, dir);
+
 /**
  * Côté d'arrivée sur l'équipement cible. Sans marche arrière programmée (aucune sortie arrière), la matière entre par
  * l'arrière (côté amont du flux, sur l'axe du canal). Avec marche arrière, elle peut partir dans les
@@ -554,7 +564,9 @@ const downward = (eq: Eq) => {
  */
 export function portOffset(eq: Eq, _box: Box, ch: number, dir: Dir, num: number): number {
   // Sorties accolées (overband posé sur le tapis) exclues : elles n'ont pas de départ dessiné.
-  const nums = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir && !o.docked).map((o) => o.num).sort((a, b) => a - b);
+  // Sorties du même côté seulement (une sortie changée de côté part avec celles de l'autre côté).
+  const f = flipped(eq, ch, dir, num);
+  const nums = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir && !o.docked && !!o.flip === f).map((o) => o.num).sort((a, b) => a - b);
   return slot(eq, ch, dir, Math.max(0, nums.indexOf(num)), nums.length);
 }
 
@@ -569,10 +581,23 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
   const ports = new Map<string, number>();
   // Liens accolés (machine posée sur le convoyeur) : ni tracé ni port de départ, seulement un joint.
   const docked = dockedLinks(p);
+  // Machine posée sur un tapis (hors valoriste) : chaque sortie part du côté du tapis où se trouve
+  // l'équipement relié (gauche ou droite du tapis, en travers de son flux).
+  const autoSide = (l: Link): Flow | null => {
+    const src = eqs.get(l.from.eq);
+    const dst = eqs.get(l.to.eq);
+    const belt = src?.dockedTo ? eqs.get(src.dockedTo) : undefined;
+    if (!src || !dst || !belt || dockKind(src.hg[0]?.type ?? '') === 'flank') return null;
+    const sb = boxes.get(src.id)!;
+    const db = boxes.get(dst.id)!;
+    return isHorizontal(belt.flow) ? (db.cy < sb.cy ? 'N' : 'S') : db.cx < sb.cx ? 'W' : 'E';
+  };
+  const sideOfLink = (l: Link): Flow => autoSide(l) ?? outSide(eqs.get(l.from.eq)!, l.from.ch, l.from.dir, l.from.num);
+  const keyOf = (l: Link) => `${l.from.eq}|${l.from.ch}|${l.from.dir}|${sideOfLink(l)}`;
   const groups = new Map<string, Link[]>();
   for (const l of p.links) {
-    if (docked.has(l.id)) continue;
-    const k = `${l.from.eq}|${l.from.ch}|${l.from.dir}`;
+    if (docked.has(l.id) || !eqs.has(l.from.eq) || !eqs.has(l.to.eq)) continue;
+    const k = keyOf(l);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k)!.push(l);
   }
@@ -581,14 +606,18 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
   for (const g of groups.values()) {
     const e = eqs.get(g[0].from.eq);
     if (!e) continue;
-    for (const l of g) ports.set(l.id, portOffset(e, boxes.get(e.id)!, l.from.ch, l.from.dir, l.from.num));
+    if (autoSide(g[0])) {
+      // Côté choisi par le routage : les sorties de ce côté se partagent la place, dans l'ordre des numéros.
+      const sorted = [...g].sort((x, y) => x.from.num - y.from.num);
+      sorted.forEach((l, i) => ports.set(l.id, slot(e, l.from.ch, l.from.dir, i, sorted.length)));
+    } else for (const l of g) ports.set(l.id, portOffset(e, boxes.get(e.id)!, l.from.ch, l.from.dir, l.from.num));
   }
 
   const valid = p.links.filter((l) => eqs.has(l.from.eq) && eqs.has(l.to.eq) && !docked.has(l.id));
   // Départ droit : plus long sous des étiquettes posées sur le trait (départ horizontal) ; à côté d'un
   // trait vertical, l'étiquette ne demande que sa hauteur.
-  const labelRun = (src: Eq, l: Link) =>
-    (groups.get(`${l.from.eq}|${l.from.ch}|${l.from.dir}`)?.length ?? 1) < 2 ? 12 : isHorizontal(departureSide(src, l.from.dir)) ? LABEL_RUN : LABEL_RUN_V;
+  const labelRun = (l: Link) =>
+    (groups.get(keyOf(l))?.length ?? 1) < 2 ? 12 : isHorizontal(sideOfLink(l)) ? LABEL_RUN : LABEL_RUN_V;
   // Coude commun des sorties d'un même départ (équipement, canal, sens) : celui de l'arrivée la plus
   // proche (20 px avant elle), pour que les coudes des traits frères soient alignés.
   const bends = new Map<string, number>();
@@ -596,7 +625,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
     if (g.length < 2) continue;
     const src = eqs.get(g[0].from.eq);
     if (!src) continue;
-    const side = departureSide(src, g[0].from.dir);
+    const side = sideOfLink(g[0]);
     const [vx, vy] = flowVec(side);
     const sb = boxes.get(src.id)!;
     const start = vx ? (vx > 0 ? sb.x1 : sb.x0) + vx * LABEL_RUN : (vy > 0 ? sb.y1 : sb.y0) + vy * LABEL_RUN_V;
@@ -608,7 +637,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
       const near = vx ? (vx > 0 ? db.x0 : db.x1) - vx * 20 : (vy > 0 ? db.y0 : db.y1) - vy * 20;
       if ((near - start) * (vx || vy) > 0) cands.push(near);
     }
-    if (cands.length >= 2) bends.set(`${src.id}|${g[0].from.ch}|${g[0].from.dir}`, (vx || vy) > 0 ? Math.min(...cands) : Math.max(...cands));
+    if (cands.length >= 2) bends.set(keyOf(g[0]), (vx || vy) > 0 ? Math.min(...cands) : Math.max(...cands));
   }
   const route = (l: Link, placed: Placed[]): Pt[] => {
     const src = eqs.get(l.from.eq)!;
@@ -619,7 +648,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
       const sSide = l.from.dir === 'avant' ? src.flow : opposite(src.flow);
       return selfLoop(a.box, channelAnchor(src, a.box, sSide, a.ch), channelAnchor(src, a.box, opposite(sSide), b.ch), sSide);
     }
-    return routeLink(a, b, obstaclesFor(src.id, dst.id), departureSide(src, l.from.dir), arrivalSide(dst, a.box, b.box), placed, bends.get(`${l.from.eq}|${l.from.ch}|${l.from.dir}`), labelRun(src, l));
+    return routeLink(a, b, obstaclesFor(src.id, dst.id), sideOfLink(l), arrivalSide(dst, a.box, b.box), placed, bends.get(keyOf(l)), labelRun(l));
   };
   // 1re passe : chaque trait évite ceux déjà tracés. 2e et 3e passes : un trait qui croise encore est
   // retracé en tenant compte de tous les autres, gardé seulement s'il ne croise plus rien.
@@ -709,10 +738,11 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
       const ch = ci + 1;
       for (const dir of ['avant', 'arriere'] as Dir[]) {
         const free = c.outputs.filter((o) => o.dir === dir && !linked.has(`${e.id}|${ch}|${dir}|${o.num}`)).sort((x, y) => x.num - y.num);
-        const side = dir === 'avant' ? e.flow : opposite(e.flow);
-        const [vx, vy] = flowVec(side);
+        const base = dir === 'avant' ? e.flow : opposite(e.flow);
         // Même place que si la sortie était reliée : jamais sur une autre sortie.
         free.forEach((o) => {
+          const side = o.flip ? opposite(base) : base;
+          const [vx, vy] = flowVec(side);
           const [ax, ay] = anchor(box, side, sideOffset(e, side, ch) + portOffset(e, box, ch, dir, o.num));
           stubs.push({
             key: `${e.id}-${ch}-${dir}-${o.num}`,
@@ -737,14 +767,11 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
 export function handlePositions(eq: Eq, box: Box, dir: Dir): { ch: number; at: Pt; small: boolean }[] {
   const side = dir === 'avant' ? eq.flow : opposite(eq.flow);
   const [vx, vy] = flowVec(side);
-  return eq.channels.map((c, i) => {
+  return eq.channels.map((_, i) => {
     const [ax, ay] = channelAnchor(eq, box, side, i + 1);
-    const count = c.outputs.filter((o) => o.dir === dir && !o.docked).length;
-    const used = count > 0;
-    // À la place de la sortie suivante, un peu au-delà du bout des traits.
-    // Canal déjà raccordé : petit « + » au bout de la place de la sortie suivante, comme celui d'une
-    // sortie en attente (même endroit, même taille).
-    const lat = used ? slot(eq, i + 1, dir, count, count + 1) : 0;
+    // Toujours au même endroit, que la sortie soit raccordée ou non : sur l'axe du canal, au bout du trait
+    // (là où serait le « + » d'une sortie en attente).
+    const lat = 0;
     // Même taille et même distance pour tous les « + » de sortie : symétriques d'un canal à l'autre.
     const out = 16;
     return { ch: i + 1, at: [ax + vx * out + (vx === 0 ? lat : 0), ay + vy * out + (vy === 0 ? lat : 0)] as Pt, small: true };

@@ -50,9 +50,15 @@ export function createEq(cat: Catalogue, p: Pivot, hg0: string, x: number, y: nu
     // Convoyeur sur variateur : marche arrière autorisée d'office (le variateur sait inverser).
     options: { ...defaultOptions(cat), ...(hg0 === 'BELT' && hg.some((h) => h.type === 'DRIV') ? { reverseAllowed: true } : {}), ...(o.options ?? {}) },
     setpoints: defaultSetpoints(cat, hg[0].type),
-    // Nativement, le canal 1 a sa sortie 1.1 déclarée, en attente de raccordement (sauf armoire « no action »).
+    // Nativement, le canal 1 a sa sortie 1.1 déclarée, en attente de raccordement (sauf armoire « no action ») ;
+    // une machine de séparation a d'emblée sa sortie négative (−) et sa sortie positive (+).
     channels: Array.from({ length: Math.min(MAX.channels, o.channels ?? 1) }, (_, i) => ({
-      outputs: i === 0 && !cat.noAction.includes(hg0) ? [{ dir: 'avant' as const, num: 1 }] : [],
+      outputs:
+        i !== 0 || cat.noAction.includes(hg0)
+          ? []
+          : symbolOf(hg0).group === 'Séparation'
+            ? [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }]
+            : [{ dir: 'avant' as const, num: 1 }],
     })),
   };
 }
@@ -173,6 +179,16 @@ export function removeOutput(p: Pivot, ref: OutputRef): Pivot {
   }));
   const cleaned = { ...next, links: next.links.filter((l) => !sameOutput(l.from, ref)) };
   return touch(renumber(cleaned, ref.eq, ref.ch, ref.dir, numsOf(cleaned, ref.eq, ref.ch, ref.dir)));
+}
+
+/** Fait partir une sortie de l'autre côté de l'équipement (ou la remet de son côté). */
+export function flipOutput(p: Pivot, ref: OutputRef): Pivot {
+  return touch(mapEq(p, ref.eq, (e) => ({
+    ...e,
+    channels: e.channels.map((c, i) =>
+      i !== ref.ch - 1 ? c : { outputs: c.outputs.map((o) => (o.dir === ref.dir && o.num === ref.num ? { ...o, flip: !o.flip || undefined } : o)) },
+    ),
+  })));
 }
 
 /** Donne à une sortie le numéro voulu (ex. la mettre en sortie 1) ; les autres se décalent. */

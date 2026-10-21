@@ -50,8 +50,12 @@ export function usePivotHistory(init: () => Pivot) {
     });
   }, []);
 
-  /** Modification transitoire (pendant un glisser), sans entrée d'historique. */
-  const preview = useCallback((next: Pivot) => setH((s) => ({ ...s, present: settleDocked(next) })), []);
+  /**
+   * Modification transitoire (pendant un glisser), sans entrée d'historique. Pas de rangement des
+   * machines accolées ici : une machine glissée le long de son tapis doit suivre la souris ; elle est
+   * rangée au lâcher (commit), d'après l'endroit où on la lâche.
+   */
+  const preview = useCallback((next: Pivot) => setH((s) => ({ ...s, present: next })), []);
 
   const undo = useCallback(() => {
     setH((s) => (s.past.length ? { past: s.past.slice(0, -1), present: s.past[s.past.length - 1], future: [s.present, ...s.future] } : s));

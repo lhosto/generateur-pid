@@ -1,8 +1,8 @@
 // Canevas PID : écran Unified 1920×1080, zoom/déplacement, sélection, gestes « + », liens.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Abbr, getLang, hgLabel, plain, rich, tx } from '../i18n';
+import { getLang, hgLabel, plain, rich, tx } from '../i18n';
 import type { Catalogue } from '../model/catalogue';
-import { type Box, boxAt, chEdges, CHUTE_SIZE, eqBox, flowVec, FONT, hg0Of, isHorizontal, leftSign, opposite, SCREEN, snap, textWidth } from '../model/geometry';
+import { type Box, boxAt, chAxis, chEdges, CHUTE_SIZE, eqBox, flowVec, FONT, hg0Of, isHorizontal, leftSign, opposite, SCREEN, snap, textWidth } from '../model/geometry';
 import { axisCandidates } from '../model/straighten';
 import { guideSnap } from '../model/align';
 import {
@@ -12,15 +12,15 @@ import {
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
 import { handlePositions, loopLinks, outputColor, placeTags, shortTag, arMark, routeAll, tagAnchor, type Pt } from '../model/route';
 import {
-  canAddChannel, canAddOutput, freeOutputNum, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
+  canAddChannel, canAddOutput, canRemoveOutput, freeOutputNum, hgDef, isNoAction, MAX, nextOutputNum, outputPolarity, outputsOf, pad2, reverseBlocked,
   chainRepere, zoneOf,
 } from '../model/rules';
 import { Icon } from '../ui/ui';
 import { Glyph } from '../panels/Palette';
 import { EqNode } from './EqNode';
 import { ChuteShape, labelPos } from './symbols';
-import { isSeparation, symbolOf } from '../model/symbols';
-import { cover, coverage, dockedBand, dockedChannelAt, dockedLinks, dockedNumsFree, dockedOn, dockKind, dockLinkTo, dockOnDrop, swapDocked, uncover } from '../model/dock';
+import { symbolOf } from '../model/symbols';
+import { cover, dockedBand, dockedChannelAt, dockedLinks, dockedNumsFree, dockedOn, dockKind, dockLinkTo, dockOnDrop, swapDocked, uncover } from '../model/dock';
 
 export interface Selection {
   eqs: string[];
@@ -86,6 +86,13 @@ const DOCK_MENU = ['OVPM', 'OVCA', 'MAGP', 'OPSO', 'ROBO', 'PICK'];
 const chLabel = (eq: Eq, ch: number) => {
   const n = eq.channels.length;
   return tx(n < 2 ? L.chMain : ch === 1 ? L.chLeft : ch === n ? L.chRight : L.chCenter);
+};
+
+/** Sens dominant d'un équipement vers un point (pour orienter ce qu'on y pose). */
+const towards = (from: Eq, at: Pt): 'E' | 'W' | 'S' | 'N' => {
+  const dx = at[0] - from.x;
+  const dy = at[1] - from.y;
+  return Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'E' : 'W') : dy >= 0 ? 'S' : 'N';
 };
 
 /** Majuscule initiale (« Canal de gauche »). */
@@ -213,6 +220,7 @@ const L = {
   tabMin: { fr: 'Un équipement garde au moins un canal', en: 'An Equipment item keeps at least one channel' },
   tabWhat: { fr: 'Canaux [CH] : voies de matière de l’équipement', en: 'Channels [CH]: material lanes of the Equipment item' },
   menuTitle: { fr: (r: string) => `Ajouter après ${r}`, en: (r: string) => `Add after ${r}` },
+  menuLinkPending: { fr: 'Raccorder la sortie en attente', en: 'Connect the pending output' },
   dockTitle: { fr: (r: string) => `Poser sur ${r}`, en: (r: string) => `Put on ${r}` },
   numHeld: { fr: 'Place non disponible : sortie négative, machine de bout de tapis ou machine posée sur le tapis', en: 'Not available: negative output, belt-head machine or machine on the belt' },
   coverLess: { fr: (r: string, k: number) => `Ne plus traiter le canal ${k} de ${r}`, en: (r: string, k: number) => `Stop handling channel ${k} of ${r}` },
@@ -622,6 +630,9 @@ export function Canvas(props: Props) {
   /** Supprime une sortie en attente (depuis son menu) ; les sorties suivantes du canal se renumérotent. */
   const dropPending = (ref: OutputRef) => {
     setMenu(null);
+    // Dernière sortie d'un canal : obligatoire (sauf stockage) — rien n'est supprimé.
+    const e = findEq(live.current.pivot, ref.eq);
+    if (!e || !canRemoveOutput(e, ref.ch, ref.dir)) return;
     props.commit(removeOutput(live.current.pivot, ref));
     props.setSel(EMPTY_SEL);
   };
@@ -654,12 +665,15 @@ export function Canvas(props: Props) {
       const at = m.at ?? (() => { const q = placeNext(pv, src, ref.dir, hg0, ref.ch); return [q.x, q.y] as Pt; })();
       const exists = outputsOf(src, ref.ch, ref.dir).some((o) => o.num === ref.num);
       if (!exists || pv.links.some((l) => sameOutput(l.from, ref))) return;
-      // Même sens que le « + » : une sortie arrière repart à contre-flux.
-      const flow = ref.dir === 'avant' ? src.flow : opposite(src.flow);
+      // Même sens que le « + » : une sortie arrière repart à contre-flux. Machine posée sur un tapis : le
+      // sens suit l'endroit où on pose l'équipement (en haut, en bas, à gauche, à droite).
+      const flow = src.dockedTo && m.at ? towards(src, m.at) : ref.dir === 'avant' ? src.flow : opposite(src.flow);
       const made = addEq(cat, pv, hg0, at[0], at[1], { flow, zone: zoneOf(src.repere), repere: chainRepere(pv, src, hg0), command });
       next = { p: connect(made.p, ref, { eq: made.id, ch: 1 }), id: made.id };
     } else {
       next = addOutputWithNext(cat, pv, src.id, m.src.ch, m.src.dir, hg0, m.at ? { x: m.at[0], y: m.at[1] } : undefined, command);
+      // Machine posée sur un tapis : l'équipement ajouté prend le sens de l'endroit où on l'a posé.
+      if (src.dockedTo && m.at && next.id) next = { ...next, p: updateEq(next.p, next.id, { flow: towards(src, m.at) }) };
     }
     if (!next.id) return;
     props.commit(next.p);
@@ -732,7 +746,7 @@ export function Canvas(props: Props) {
     const fwd = lk.from.dir === 'avant';
     return [
       { text: tx(L.linkTitle, ra, rb), kind: 'title' },
-      { text: tx(L.linkSub, lk.from.num, fwd, polarity(lk.from.num, a ? outputsOf(a, lk.from.ch, lk.from.dir).length : 1, isSeparation(a?.hg[0]?.type ?? '')), lk.from.ch, (a?.channels.length ?? 1) > 1, lk.to.ch, (b?.channels.length ?? 1) > 1), kind: 'sub' },
+      { text: tx(L.linkSub, lk.from.num, fwd, outputPolarity(a, lk.from.ch, lk.from.dir, lk.from.num), lk.from.ch, (a?.channels.length ?? 1) > 1, lk.to.ch, (b?.channels.length ?? 1) > 1), kind: 'sub' },
       ...(loops.has(lk.id) ? [{ text: tx(L.loop), kind: 'sub' as const }] : []),
       { text: `${ra}_CH${pad2(lk.from.ch)} · S${lk.from.num} → ${rb}_CH${pad2(lk.to.ch)}`, kind: 'tech' },
       { text: rich(tx(L.linkHint)), kind: 'hint' },
@@ -747,9 +761,8 @@ export function Canvas(props: Props) {
     const ch = n < 2 ? L.chMain : ref.ch === 1 ? L.chLeft : ref.ch === n ? L.chRight : L.chCenter;
     return [
       { text: tx(L.stubTitle, ra, tx(ch)), kind: 'title' },
-      { text: tx(L.stubSub, polarity(ref.num, a ? outputsOf(a, ref.ch, ref.dir).length : 1, isSeparation(a?.hg[0]?.type ?? '')), ref.dir === 'avant'), kind: 'sub' },
-      { text: `${ra}_CH${pad2(ref.ch)} · S${ref.num}`, kind: 'tech' },
-      { text: rich(tx(L.stubHint)), kind: 'hint' },
+      { text: tx(L.stubSub, outputPolarity(a, ref.ch, ref.dir, ref.num), ref.dir === 'avant'), kind: 'sub' },
+
     ];
   };
 
@@ -852,13 +865,39 @@ export function Canvas(props: Props) {
                 </g>
               );
             })}
+          </g>
+
+          {pivot.equipments.map((eq) => (
+            <EqNode
+              key={eq.id}
+              eq={eq}
+              selected={selEqs.has(eq.id)}
+              incomplete={props.incomplete.has(eq.id)}
+              fault={props.faults.has(eq.id)}
+              onDown={onEqDown}
+              onHover={setHoverDelayed}
+              belt={eq.dockedTo && boxes.get(eq.dockedTo) ? { box: boxes.get(eq.dockedTo)!, flow: findEq(pivot, eq.dockedTo)!.flow } : undefined}
+            />
+          ))}
+
+          {/* Sorties en attente : après les équipements, leur « + » passe au-dessus des repères. */}
+          <g>
             {routed.stubs.map((s, _i, all) => {
               // Sorties en attente côte à côte (même équipement, même côté) : étiquettes échelonnées une sur
               // deux le long du trait, pour qu'elles ne se chevauchent pas.
               const [sa, sb] = s.points;
               const side = (q: typeof s) => `${q.ref.eq}|${Math.sign(q.points[1][0] - q.points[0][0])}|${Math.sign(q.points[1][1] - q.points[0][1])}`;
               const mates = all.filter((q) => side(q) === side(s)).sort((x, y) => x.points[0][0] - y.points[0][0] || x.points[0][1] - y.points[0][1]);
-              const stagger = mates.length > 1 && mates.indexOf(s) % 2 === 1 ? FONT.out * 1.2 : 0;
+              // Échelonnées seulement si elles se chevaucheraient (étiquettes plus larges que l'écart des sorties).
+              const gapOf = (q: typeof s, r: typeof s) => Math.abs(q.points[0][0] - r.points[0][0]) + Math.abs(q.points[0][1] - r.points[0][1]);
+              // Encombrement d'une étiquette en travers des sorties : sa largeur (sorties côte à côte, vers le
+              // haut ou le bas) ou sa hauteur (sorties empilées, vers la gauche ou la droite ; signes − / + petits).
+              const across = (q: typeof s) => {
+                const t = shortTag(findEq(pivot, q.ref.eq), q.ref.ch, q.ref.num, q.ref.dir);
+                return q.points[0][0] === q.points[1][0] ? textWidth(t, FONT.out) : /^[−+]+$/.test(t) ? FONT.sign * 0.9 : FONT.out * 0.9;
+              };
+              const wide = mates.some((q, i) => i > 0 && across(q) + 2 > gapOf(q, mates[i - 1]));
+              const stagger = wide && mates.indexOf(s) % 2 === 1 ? FONT.out * 1.2 : 0;
               const on = !!sel.stub && sameOutput(sel.stub, s.ref);
               const [a, b] = s.points;
               return (
@@ -893,19 +932,6 @@ export function Canvas(props: Props) {
             })}
           </g>
 
-          {pivot.equipments.map((eq) => (
-            <EqNode
-              key={eq.id}
-              eq={eq}
-              selected={selEqs.has(eq.id)}
-              incomplete={props.incomplete.has(eq.id)}
-              fault={props.faults.has(eq.id)}
-              onDown={onEqDown}
-              onHover={setHoverDelayed}
-              belt={eq.dockedTo && boxes.get(eq.dockedTo) ? { box: boxes.get(eq.dockedTo)!, flow: findEq(pivot, eq.dockedTo)!.flow } : undefined}
-            />
-          ))}
-
           {/* Fins de flèche qui traversent un équipement jusqu'à l'axe du canal visé : par-dessus les formes. */}
           <g pointerEvents="none" fill="none" strokeLinecap="round">
             {routed.links.filter((l) => l.inner && !(wire && wire.mode === 'retarget' && wire.linkId === l.id)).map((l) => {
@@ -928,42 +954,7 @@ export function Canvas(props: Props) {
             })}
           </g>
 
-          {/* Joints des machines accolées (overband, poulie) : par-dessus les formes, cliquables. */}
-          <g>
-            {routed.links.filter((l) => l.docked).map((l) => {
-              const on = sel.link === l.id;
-              const hot = hoverLink === l.id;
-              const { x, y } = l.docked!;
-                // Machine accolée : un joint plein par canal traité, numéro de la sortie écrit dedans,
-                // cliquable (sélectionne le lien).
-                // Machine à plusieurs canaux : canal d'arrivée après la flèche, nommé par sa place dans le sens
-                // du flux : G (gauche, canal 1), M (milieu), D (droite) — « 1++→G », « 3.3→D ».
-                const mn = findEq(pivot, l.link.to.eq)?.channels.length ?? 1;
-                const into = mn > 1 ? `→${l.link.to.ch === 1 ? 'G' : l.link.to.ch === mn ? 'D' : 'M'}` : '';
-                const text = shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir) + into;
-                const [w, h] = [textWidth(text, FONT.joint) + 3, FONT.joint + 3];
-                return (
-                  <g
-                    key={l.id}
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      if (e.button === 1 || space.current) return startPan(e);
-                      props.setSel({ ...EMPTY_SEL, link: l.id });
-                      setTip(null);
-                    }}
-                    onPointerEnter={(e) => { setHoverLink(l.id); if (sel.link !== l.id) pointerTip(e, linkTip(l.link)); }}
-                    onPointerLeave={() => { setHoverLink(null); setTip(null); }}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <rect x={x - w / 2 - 4} y={y - h / 2 - 4} width={w + 8} height={h + 8} fill="transparent" />
-                    <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={2} fill={on ? 'var(--pid-select)' : hot ? '#fff' : 'var(--pid-stroke-light)'} />
-                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ font: `600 ${FONT.joint}px var(--font-tag)`, fill: '#262c2a', pointerEvents: 'none' }}>
-                      {text}
-                    </text>
-                  </g>
-                );
-            })}
-          </g>
+          {/* Joints des machines posées sur un tapis : ni dessinés ni cliquables (la représentation suffit). */}
           {/* Étiquettes des sorties : par-dessus tous les traits (jamais cachées derrière une flèche). Clic = sélectionner le trait. */}
           <g>
             {routed.links.map((l) => {
@@ -1045,26 +1036,29 @@ export function Canvas(props: Props) {
             </g>
           )}
 
-          {/* Machine posée sur le tapis, sélectionnée : « − » / « + » sur ses deux bords pour retirer ou
-              ajouter un canal traité (la réduire au seul canal du dessous, l'étendre au canal voisin). */}
+          {/* Machine posée sur le tapis, sélectionnée : un « − » / « + » par canal du tapis, sur son axe, juste en
+              amont de la machine : retirer un canal traité (même celui du milieu) ou en ajouter un. */}
           {sel.eqs.length === 1 && (() => {
             const id = sel.eqs[0];
-            const cov = coverage(pivot, id);
             const m = findEq(pivot, id);
             const belt = m?.dockedTo ? findEq(pivot, m.dockedTo) : undefined;
             const b = boxes.get(id);
-            if (!cov || !m || !belt || !b) return null;
+            const bb = belt ? boxes.get(belt.id) : undefined;
+            if (!m || !belt || !b || !bb || dockKind(hg0Of(m)) === 'flank') return null;
+            const treated = new Set(pivot.links.filter((l) => l.from.eq === belt.id && l.to.eq === id && l.from.dir === 'avant').map((l) => l.from.ch));
             const hor = isHorizontal(belt.flow);
-            const btn = (edge: 'neg' | 'pos', kind: 'minus' | 'plus') => {
-              const k = kind === 'minus' ? cov[edge].shrink : cov[edge].grow;
-              if (k === undefined) return null;
-              const off = kind === 'minus' ? -7 : 7;
-              const cx = hor ? b.cx + off : edge === 'neg' ? b.x0 - 8 : b.x1 + 8;
-              const cy = hor ? (edge === 'neg' ? b.y0 - 8 : b.y1 + 8) : b.cy + off;
+            const [fx, fy] = flowVec(belt.flow);
+            const btn = (k: number) => {
+              const kind: 'minus' | 'plus' = treated.has(k) ? 'minus' : 'plus';
+              // Dernier canal traité : on ne le retire pas (la machine traite toujours au moins un canal).
+              if (kind === 'minus' && treated.size < 2) return null;
+              const a = chAxis(belt, k);
+              const cx = hor ? b.cx - fx * (b.w / 2 + 7) : bb.cx + a;
+              const cy = hor ? bb.cy + a : b.cy - fy * (b.h / 2 + 7);
               const lines: TipLine[] = [{ text: tx(kind === 'minus' ? L.coverLess : L.coverMore, belt.repere || '?', k), kind: 'title' }];
               return (
                 <g
-                  key={edge + kind}
+                  key={k}
                   onPointerEnter={(e) => pointerTip(e, lines)}
                   onPointerLeave={() => setTip(null)}
                   onPointerDown={(e) => {
@@ -1080,7 +1074,7 @@ export function Canvas(props: Props) {
                 </g>
               );
             };
-            return <g>{(['neg', 'pos'] as const).flatMap((edge) => [btn(edge, 'minus'), btn(edge, 'plus')])}</g>;
+            return <g>{belt.channels.map((_, i) => btn(i + 1))}</g>;
           })()}
           {handleTarget && (
             <Handles
@@ -1095,6 +1089,7 @@ export function Canvas(props: Props) {
               pending={new Set(handleTarget.channels.flatMap((_, ci) => (['avant', 'arriere'] as Dir[]).filter((dir) => freeOutputNum(pivot, handleTarget, ci + 1, dir) !== null).map((dir) => `${ci + 1}|${dir}`)))}
               incomingLast={pivot.links.filter((l) => l.to.eq === handleTarget.id && l.to.ch === handleTarget.channels.length).length}
               others={[...boxes.entries()].filter(([id]) => id !== handleTarget.id).map(([, b]) => b)}
+              channelCap={handleTarget.dockedTo ? findEq(pivot, handleTarget.dockedTo)?.channels.length : undefined}
               extent={(() => {
                 // Tapis portant des machines : l'onglet des canaux se pose au-delà d'elles, côté entrée.
                 const on = dockedOn(pivot, handleTarget.id).map((id) => boxes.get(id)).filter((b): b is Box => !!b);
@@ -1222,7 +1217,7 @@ export function Canvas(props: Props) {
                   onClick={() => !held && n !== ref.num && props.commit(docked ? swapDocked(pivot, selLink.id, n) : setOutputNum(pivot, ref, n))}
                   style={{ ...btn, background: n === ref.num ? 'var(--abi-green)' : 'var(--surface-nav)', color: held ? '#6f7a74' : '#fff', cursor: held ? 'not-allowed' : 'pointer', borderStyle: held ? 'dashed' : 'solid' }}
                 >
-                  {shortTag(src, ref.ch, n, ref.dir)}
+                  {shortTag(src, ref.ch, n, ref.dir) || n}
                 </button>
               );
             })}
@@ -1269,7 +1264,6 @@ export function Canvas(props: Props) {
                 <span style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ font: '500 13px var(--font-sans)' }}>
                     {hgLabel(cat.hgTypes[k])}
-                    <Abbr>{k}</Abbr>
                   </span>
                   <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{note(k)}</span>
                 </span>
@@ -1293,8 +1287,6 @@ export function Canvas(props: Props) {
         if (props.currentNature !== DEFAULT_NEXT && cat.hgTypes[props.currentNature]) items.push({ hg0: props.currentNature, note: tx(L.menuLast) });
         const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '3px 10px 3px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#fff' };
         const pos = menuPos ?? { left: menu.x + 10, top: menu.y + 10 };
-        // Sortie libre raccordée : son propre numéro ; sinon celui de la sortie qui sera créée.
-        const outNum = menu.ref?.num ?? nextOutputNum(src, menu.src.ch, menu.src.dir) ?? 1;
         return (
           <div
             ref={menuRef}
@@ -1330,8 +1322,11 @@ export function Canvas(props: Props) {
             style={{ position: 'absolute', left: pos.left, top: pos.top, width: 'max-content', minWidth: 250, background: 'var(--surface-page)', border: '1px solid var(--abi-green)', boxShadow: 'var(--shadow-drawer)', zIndex: 7 }}
           >
             <div style={{ padding: '7px 10px', background: 'var(--surface-panel-header)', font: '600 12px var(--font-sans)' }}>
-              {tx(L.menuTitle, src.repere || '?')}
-              <span style={{ ...TIP_STYLE.tech, marginLeft: 8 }}>{tx(L.outTitle, outNum, menu.src.dir === 'avant')}</span>
+              {/* Mêmes textes que les bulles : « 08Aa - Canal de gauche », puis ce que fait le menu. */}
+              {`${src.repere || '?'} - ${cap(chLabel(src, menu.src.ch))}`}
+              <span style={{ ...TIP_STYLE.tech, marginLeft: 8 }}>
+                {menu.ref ? tx(L.menuLinkPending) : tx(menu.src.dir === 'avant' ? L.addOutOn : L.addOutBackOn, outputsOf(src, menu.src.ch, menu.src.dir).length + 1)}
+              </span>
             </div>
             {items.map((it) => (
               <button key={it.hg0 + (it.command ?? '')} type="button" role="menuitem" className="abi-row" onClick={() => addFromMenu(menu, it.hg0, it.command)} style={row}>
@@ -1341,7 +1336,6 @@ export function Canvas(props: Props) {
                   <span style={{ font: '500 13px var(--font-sans)' }}>
                     {hgLabel(cat.hgTypes[it.hg0])}
                     {it.variant && ` — ${it.variant}`}
-                    <Abbr>{it.command ? `${it.hg0} · ${it.command}` : it.hg0}</Abbr>
                   </span>
                   <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{it.note}</span>
                 </span>
@@ -1361,16 +1355,14 @@ export function Canvas(props: Props) {
               <Icon name="grid" size={18} />
               <span style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ font: '500 13px var(--font-sans)' }}>{tx(L.menuOther)}</span>
-                <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{tx(L.menuOtherSub)}</span>
               </span>
             </button>
             {/* Sortie en attente : on peut aussi la supprimer d'ici (le menu garde le clavier). */}
-            {menu.ref && (
+            {menu.ref && canRemoveOutput(src, menu.ref.ch, menu.ref.dir) && (
               <button type="button" role="menuitem" className="abi-row" onClick={() => dropPending(menu.ref!)} style={{ ...row, padding: '9px 10px', borderTop: '1px solid var(--border-divider)' }}>
                 <Icon name="trash" size={18} color="var(--pid-fault-stroke)" />
                 <span style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ font: '500 13px var(--font-sans)' }}>{tx(L.menuDelete)}</span>
-                  <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{tx(L.menuDeleteSub)}</span>
                 </span>
               </button>
             )}
@@ -1405,6 +1397,8 @@ function Handles(props: {
   onBodyDown: (e: React.PointerEvent) => void;
   /** Convoyeur : « + » au bout, dedans, pour poser une machine dessus (overband, robot…). */
   onDock?: (e: React.PointerEvent) => void;
+  /** Machine posée sur un tapis : nombre de canaux maximal (celui du tapis). */
+  channelCap?: number;
   /** Tapis portant des machines : boîte qui les englobe ; l'onglet des canaux se pose au-delà, côté entrée. */
   extent?: { x0: number; y0: number; x1: number; y1: number };
 }) {
@@ -1458,7 +1452,8 @@ function Handles(props: {
   };
 
   // Onglet des canaux, hors de la forme : au-dessus en flux horizontal, à droite en flux vertical.
-  const addCh = canAddChannel(eq);
+  // Machine posée sur un tapis : jamais plus de canaux que lui (tricanal seulement sur un tapis tricanal).
+  const addCh = canAddChannel(eq) && (props.channelCap === undefined || n < props.channelCap);
   const rmCh = n > 1;
   const TW = TAB.w;
   const TH = TAB.h;
@@ -1528,7 +1523,10 @@ function Handles(props: {
   const dock = (() => {
     if (!props.onDock) return null;
     const [vx, vy] = flowVec(eq.flow);
-    const d = (hor ? box.w : box.h) / 2 - 10;
+    // Tapis nu : près du bout aval. Tapis portant des machines (le bout est pris) : juste après son
+    // repère, côté entrée, toujours libre.
+    const half = (hor ? box.w : box.h) / 2;
+    const d = props.extent ? -half + (hor ? textWidth(eq.repere || '?') : FONT.tag) + 14 : half - 10;
     const cx = box.cx + vx * d;
     const cy = box.cy + vy * d;
     const lines: TipLine[] = [{ text: tx(L.dockTip), kind: 'title' }, { text: tx(L.dockTipSub), kind: 'hint' }];
@@ -1551,14 +1549,15 @@ function Handles(props: {
       {handlePositions(eq, box, 'avant').map((h) => chip('avant', h.ch, h.at, h.small))}
       {/* Machine posée sur un convoyeur : pas de marche arrière, aucun « + » de ce côté. */}
       {!eq.dockedTo && handlePositions(eq, box, 'arriere').map((h) => chip('arriere', h.ch, h.at, h.small))}
-      <g onPointerEnter={props.onEnter} onPointerLeave={props.onLeave} onPointerDown={props.onBodyDown} style={{ cursor: 'move' }}>
+      {/* Valoriste : un seul canal, pas d'onglet des canaux. */}
+      {hg0Of(eq) !== 'PICK' && <g onPointerEnter={props.onEnter} onPointerLeave={props.onLeave} onPointerDown={props.onBodyDown} style={{ cursor: 'move' }}>
         <rect x={tx0} y={ty0} width={TW} height={TH} rx={TH / 2} fill="var(--pid-band)" stroke="#6f7a74" strokeWidth={1} />
         <text x={tx0 + TW / 2} y={ty0 + TH / 2} textAnchor="middle" dominantBaseline="central" style={{ font: '600 9.5px var(--font-sans)', fill: 'var(--pid-text)', pointerEvents: 'none' }}>
           {tx(L.nbChannels, n)}
         </text>
         {btn('minus')}
         {btn('plus')}
-      </g>
+      </g>}
     </g>
   );
 }
