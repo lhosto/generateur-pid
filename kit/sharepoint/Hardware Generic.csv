@@ -82,6 +82,7 @@
 "PD",,,,"Répartiteur de puissance","Power divider",,"NA","Non","False",,,,,,,,,,,
 "PHON",,,,"Téléphone ","Phone",,"A coder","Non","False",,,,,,,,,,,
 "PI",,,,"Carte mesure de puissance","Power input card ",,"SAT ok","Non","False",,,,,,,,,,,
+"PICK",,,,"Valoriste","Manual Sorting",,,"Oui","Vrai",,,,,,,,,,,
 "PLC",,,,"API","PLC",,"A coder","Non","False",,,,,,,,,,,
 "PLEN","391",,,"Plenum de ventilation","Ventilation plenum",,"SAT ok","Oui","Vrai",,,,,,,,,,,
 "POI",,,,"Onduleur","Power inverter",,"NA","Non","False",,,,,,,,,,,

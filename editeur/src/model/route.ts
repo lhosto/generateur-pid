@@ -1,11 +1,11 @@
 // Routage orthogonal des liens. Chaque canal a un axe fixe (geometry.sideOffset) : tous les liens d'un
 // canal partent et arrivent exactement sur cet axe, si bien que deux canaux alignés donnent un trait droit.
 // Le côté de départ fait face à la cible ; si la voie est bouchée, tracé en L puis Z sur l'autre axe.
-import { chAxis, chRoom, portUnit, eqBox, flowVec, isHorizontal, opposite, sideOffset, type Box } from './geometry';
+import { type Box, chAxis, chRoom, eqBox, flowVec, FONT, isHorizontal, opposite, portUnit, sideOffset, textWidth } from './geometry';
 import type { Dir, Eq, Flow, Link, OutputRef, Pivot } from './pivot';
 import { outputLabel } from './rules';
 import { isSeparation, symbolOf } from './symbols';
-import { contact, dockedLinks } from './dock';
+import { contact, dockedLinks, dockKind, jointH, jointW, upstreamEdge } from './dock';
 
 export type Pt = [number, number];
 
@@ -68,8 +68,8 @@ export function tagFor(nChannels: number, ch: number, num: number, count: number
 
 /** Étiquette d'une sortie d'un équipement (voir tagFor). */
 /**
- * Où écrire « AR » sur un trait de marche arrière : au milieu de son plus long segment, décalé de 7 px
- * (au-dessus d'un segment horizontal, à droite d'un vertical), loin des étiquettes de départ.
+ * Où écrire « AR » sur un trait de marche arrière : sur le trait, au milieu de son plus long segment,
+ * loin des étiquettes de départ (le halo laisse deviner le trait derrière).
  */
 export function arMark(points: Pt[]): { x: number; y: number; anchor: 'start' | 'middle' } {
   let best = 1;
@@ -79,17 +79,18 @@ export function arMark(points: Pt[]): { x: number; y: number; anchor: 'start' | 
     if (d > len) (len = d), (best = i);
   }
   const [a, b] = [points[best - 1], points[best]];
-  const vertical = Math.abs(a[0] - b[0]) < 0.5;
-  const mx = (a[0] + b[0]) / 2;
-  const my = (a[1] + b[1]) / 2;
-  return vertical ? { x: mx + 5, y: my, anchor: 'start' } : { x: mx, y: my - 7, anchor: 'middle' };
+  return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, anchor: 'middle' };
 }
 
 export function shortTag(eq: Eq | undefined, ch: number, num: number, dir: Dir): string {
   if (!eq) return outputTag(ch, num, dir);
-  // Overband / poulie accolé sur ce canal (sortie « k+ » au joint) : la sortie principale devient « k− ».
+  // Machines accolées sur ce canal : la sortie principale est « k− », les joints « k+ », « k++ » ; dès 4
+  // sorties « k.1(−) », « k.2 »… (règle des machines de séparation).
   const outs = eq.channels[ch - 1]?.outputs ?? [];
-  if (outs.some((o) => o.dir === dir && o.docked) && !outs.some((o) => o.dir === dir && o.num === num && o.docked)) return `${ch}−`;
+  if (outs.some((o) => o.dir === dir && o.docked)) {
+    const count = outs.filter((o) => o.dir === dir).length;
+    return count >= 4 ? `${ch}.${num}${num === 1 ? '(−)' : ''}` : `${ch}${num === 1 ? '−' : '+'.repeat(num - 1)}`;
+  }
   const count = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir && !o.docked).length;
   return tagFor(eq.channels.length, ch, num, count, dir, isSeparation(eq.hg[0]?.type ?? ''));
 }
@@ -100,13 +101,15 @@ export interface TagPos {
   anchor: 'start' | 'middle';
 }
 
-/** Largeur approximative d'une étiquette (chasse fixe 8,5 px). */
-const tagWidth = (text: string) => text.length * 5.3 + 2;
+/** Largeur d'un nom de sortie : pastille comme les numéros des joints (corps FONT.joint). */
+const tagWidth = (text: string) => textWidth(text, FONT.joint) + 3;
+/** Demi-hauteur d'un nom de sortie. */
+const TAG_HALF = (FONT.joint + 3) / 2;
 
 function tagBox(t: TagPos, text: string): Box {
   const w = tagWidth(text);
   const x0 = t.anchor === 'middle' ? t.x - w / 2 : t.x;
-  return { x0, y0: t.y - 5, x1: x0 + w, y1: t.y + 5, cx: x0 + w / 2, cy: t.y, w, h: 10 };
+  return { x0, y0: t.y - TAG_HALF, x1: x0 + w, y1: t.y + TAG_HALF, cx: x0 + w / 2, cy: t.y, w, h: 2 * TAG_HALF };
 }
 
 /** Positions candidates le long du trait : après le premier coude, puis depuis le départ, tous les 10 px. */
@@ -116,16 +119,12 @@ function tagCandidates(points: Pt[], w = 16): TagPos[] {
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
     const vx = (b[0] - a[0]) / (len || 1);
     const vy = (b[1] - a[1]) / (len || 1);
-    const vertical = Math.abs(vx) < 0.5;
-    for (let d = from; d <= Math.max(from, len - 10); d += 10) {
-      const x = a[0] + vx * d;
-      const y = a[1] + vy * d;
-      out.push(vertical ? { x: x + 4, y, anchor: 'start' } : { x, y: y - 5, anchor: 'middle' });
-    }
+    // Sur le trait, centrée : le halo du fond laisse deviner le trait derrière.
+    for (let d = from; d <= Math.max(from, len - 10); d += 10) out.push({ x: a[0] + vx * d, y: a[1] + vy * d, anchor: 'middle' });
   };
   // D'abord collée au départ (on voit de quelle sortie il s'agit) : le texte commence 3 px après le
   // bord de l'équipement ; puis après le premier coude.
-  const first = Math.abs(points[1][0] - points[0][0]) < 0.5 ? 6 : w / 2 + 3;
+  const first = (Math.abs(points[1][0] - points[0][0]) < 0.5 ? TAG_HALF : w / 2) + 3;
   along(points[0], points[1], first);
   if (points.length > 2) along(points[1], points[2], 9);
   for (let i = 2; i < points.length - 1; i++) along(points[i], points[i + 1], 10);
@@ -141,8 +140,8 @@ export function placeTags(p: Pivot, links: RoutedLink[], text: (l: RoutedLink) =
   const obstacles = p.equipments.map((e) => {
     const b = eqBox(e);
     const spec = symbolOf(e.hg[0]?.type ?? '');
-    // Repère écrit sous la forme (losange / rond à pictogramme) : zone à éviter aussi.
-    return spec.picto && (spec.base === 'diamond' || spec.base === 'circle') ? { ...b, y1: b.y1 + 16 } : b;
+    // Repère écrit sous la forme (écluse, vis, broyeur…) : zone à éviter aussi.
+    return spec.labelBelow ? { ...b, y1: b.y1 + 16 } : b;
   });
   const placed: Box[] = [];
   const out = new Map<string, TagPos>();
@@ -165,17 +164,12 @@ const overlapsBox = (a: Box, b: Box, m: number) => a.x0 - m < b.x1 && a.x1 + m >
  * autres sorties du même canal (sinon un peu après le départ). Rend le point et le côté du texte.
  */
 export function tagAnchor(points: Pt[]): { x: number; y: number; anchor: 'start' | 'middle' } {
+  // Sur le trait, juste après le premier coude (ou après le départ s'il n'y en a pas).
   const [s, b] = points;
-  if (points.length > 2) {
-    const c = points[2];
-    const vertical = Math.abs(c[0] - b[0]) < 1;
-    // Sur un segment vertical : à droite du coude, un peu plus bas/haut ; sur un horizontal : au-dessus.
-    if (vertical) return { x: b[0] + 4, y: b[1] + Math.sign(c[1] - b[1]) * 9, anchor: 'start' };
-    return { x: b[0] + Math.sign(c[0] - b[0]) * 12, y: b[1] - 4, anchor: 'middle' };
-  }
-  const dx = Math.sign(b[0] - s[0]);
-  const dy = Math.sign(b[1] - s[1]);
-  return dx !== 0 ? { x: s[0] + dx * 12, y: s[1] - 4, anchor: 'middle' } : { x: s[0] + 4, y: s[1] + dy * 12, anchor: 'start' };
+  const [from, to] = points.length > 2 ? [b, points[2]] : [s, b];
+  const dx = Math.sign(to[0] - from[0]);
+  const dy = Math.sign(to[1] - from[1]);
+  return { x: from[0] + dx * 14, y: from[1] + dy * 14, anchor: 'middle' };
 }
 
 export function sideFacing(a: Box, b: Box): Flow {
@@ -343,7 +337,16 @@ function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], other
     tries.push([s, p1, [mx + off, p1[1]], [mx + off, p2[1]], p2, t]);
     tries.push([s, p1, [p1[0], my + off], [p2[0], my + off], p2, t]);
   }
-  for (const pts of tries) {
+  // Coude commun d'abord (s'il passe) ; puis, des deux tracés en L, celui qui a le moins de coudes ;
+  // puis les autres dans l'ordre.
+  const head = hint !== undefined && isHorizontal(sSide) === isHorizontal(tSide) ? 1 : 0;
+  for (let i = 0; i < head; i++) {
+    const r = ok(tries[i]);
+    if (r) return r;
+  }
+  const ls = tries.slice(head, head + 2).map(ok).filter((r): r is Pt[] => !!r).sort((x, y) => x.length - y.length);
+  if (ls.length) return ls[0];
+  for (const pts of tries.slice(head + 2)) {
     const r = ok(pts);
     if (r) return r;
   }
@@ -378,7 +381,7 @@ const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
 const LABEL_RUN = 28;
 const LABEL_RUN_V = 16;
 /** Écart minimal entre deux traits parallèles qui ne vont pas au même endroit. */
-const GAP = 8;
+const GAP = 5;
 
 /**
  * Deux segments orthogonaux se croisent (intersection strictement intérieure aux deux), ou courent
@@ -533,7 +536,16 @@ export function portPitch(eq: Eq, ch: number, count: number): number {
  * au-dessus de la négative) ; sur un côté horizontal (flux vertical) : à droite.
  */
 const slot = (eq: Eq, ch: number, dir: Dir, rank: number, count: number) =>
-  (isHorizontal(departureSide(eq, dir)) ? -1 : 1) * (rank - (count - 1) / 2) * portPitch(eq, ch, count);
+  (isHorizontal(departureSide(eq, dir)) ? (downward(eq) ? 1 : -1) : 1) * (rank - (count - 1) / 2) * portPitch(eq, ch, count);
+
+/**
+ * Sorties qui se lisent de haut en bas (S2 sous S1) : équipements hors séparation et hors convoyage
+ * (trémie de dosage, broyeur, stockage, divers). Séparation et convoyeurs gardent S2 au-dessus de S1.
+ */
+const downward = (eq: Eq) => {
+  const g = symbolOf(eq.hg[0]?.type ?? '').group;
+  return g !== 'Séparation' && g !== 'Convoyage';
+};
 
 /**
  * Décalage du départ de la sortie num par rapport à l'axe du canal. Les sorties déclarées (reliées ou
@@ -654,11 +666,28 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
     if (!docked.has(l.id)) continue;
     const src = eqs.get(l.from.eq)!;
     const dst = eqs.get(l.to.eq)!;
-    const c = contact(boxes.get(src.id)!, boxes.get(dst.id)!);
-    // Plusieurs canaux : un joint par canal, côte à côte le long du contact.
-    const k = (l.from.ch - (src.channels.length + 1) / 2) * 16;
-    if (c.vertical) c.y += k;
-    else c.x += k;
+    const sb = boxes.get(src.id)!;
+    const db = boxes.get(dst.id)!;
+    // Valoriste : joint au contact avec le flanc. Machine superposée : un joint par canal traité, sur son
+    // bord amont (là où la matière entre), à l'axe du canal.
+    // Joints posés sur le tapis, à côté de la machine (jamais dessus) : valoriste, juste dans le tapis au
+    // droit du contact ; machine superposée, devant son bord amont, à l'axe de chaque canal traité.
+    let c: { x: number; y: number; vertical: boolean };
+    if (dockKind(dst.hg[0]?.type ?? '') === 'flank') {
+      c = contact(sb, db);
+      // Mordant à peine sur le cartouche : deux valoristes face à face sur un tapis à un canal y tiennent.
+      const into = Math.sign(isHorizontal(src.flow) ? sb.cy - db.cy : sb.cx - db.cx) * ((isHorizontal(src.flow) ? jointH : jointW) / 2 - 1.5);
+      if (isHorizontal(src.flow)) c.y += into;
+      else c.x += into;
+    } else {
+      const [vx, vy] = flowVec(src.flow);
+      // Tapis vertical à plusieurs canaux : joints (écrits à l'horizontale) sur deux rangs, un canal sur
+      // deux, sinon ils se chevauchent.
+      const row = !isHorizontal(src.flow) && src.channels.length > 1 && l.from.ch % 2 === 0 ? jointH + 1 : 0;
+      const u = upstreamEdge(db, src.flow) - (isHorizontal(src.flow) ? vx * (jointW / 2 + 1) : vy * (jointH / 2 + 1 + row));
+      const a = chAxis(src, l.from.ch);
+      c = isHorizontal(src.flow) ? { x: u, y: sb.cy + a, vertical: true } : { x: sb.cx + a, y: u, vertical: false };
+    }
     links.push({
       id: l.id,
       link: l,

@@ -50,8 +50,14 @@ export interface Eq {
   setpoints: Setpoint[];
   /** 1 à 3 canaux ; le canal n est channels[n-1]. */
   channels: Channel[];
-  /** Overband / poulie accolé à ce convoyeur (id) : collé à son flanc, lien dessiné en joint. */
+  /** Machine accolée à ce convoyeur (id) : posée dessus ou à son flanc, liens dessinés en joints. */
   dockedTo?: string;
+  /** Convoyeur portant des machines accolées : longueur le long du flux (dessin seulement, recalculée). */
+  len?: number;
+  /** Valoriste accolé : côté du tapis, par rapport au sens du flux (gauche = côté du canal 1). */
+  dockSide?: 'left' | 'right';
+  /** Machine accolée : taille de son cartouche (dessin seulement, recalculée). */
+  dockSize?: { w: number; h: number };
 }
 
 export interface OutputRef {

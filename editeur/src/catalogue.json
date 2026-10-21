@@ -1,13 +1,13 @@
 {
- "version": "HG-2026-10-20+fictif",
- "date": "2026-10-20",
+ "version": "HG-2026-10-21+fictif",
+ "date": "2026-10-21",
  "fictif": true,
  "sources": {
   "hg": {
    "fichier": "kit/sharepoint/Hardware Generic.csv",
-   "lignes": 140,
-   "principaux": 48,
-   "date": "2026-10-20"
+   "lignes": 141,
+   "principaux": 49,
+   "date": "2026-10-21"
   },
   "complements": "editeur/src/fictif/complements.fictif.json"
  },
@@ -1701,6 +1701,24 @@
    "etat": "SAT ok",
    "aSaisir": false,
    "role": "proximite",
+   "superiors": [],
+   "options": [],
+   "hs": [
+    {
+     "id": "Std",
+     "label": "HS à définir"
+    }
+   ]
+  },
+  "PICK": {
+   "label": "Valoriste",
+   "labelEn": "Manual Sorting",
+   "principal": true,
+   "idWinCC": null,
+   "symbole": null,
+   "etat": null,
+   "aSaisir": true,
+   "role": "matiere",
    "superiors": [],
    "options": [],
    "hs": [

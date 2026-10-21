@@ -4,6 +4,7 @@ import type { Catalogue } from './catalogue';
 import { siteTest } from '../fictif/siteTest.fictif';
 import { minGap, overlapping, reorganize } from './layout';
 import { routeAll } from './route';
+import { SCREEN } from './geometry';
 
 const cat = catJson as unknown as Catalogue;
 
@@ -14,7 +15,7 @@ describe('réorganiser (ELK)', () => {
     expect(q.links).toEqual(p.links);
     expect(q.equipments.map((e) => e.channels)).toEqual(p.equipments.map((e) => e.channels));
     expect(overlapping(q)).toBe(0);
-    expect(bounds.w <= 1920 - 120 && bounds.h <= 1080 - 120).toBe(true);
+    expect(bounds.w <= SCREEN.w - 120 && bounds.h <= SCREEN.h - 120).toBe(true);
     expect(routeAll(q).links).toHaveLength(p.links.length);
   });
   it('équipements mélangés : rangés sans chevauchement, liens inchangés', async () => {

@@ -16,6 +16,7 @@ const PROXIMITY_ROLES = new Set(['proximite', 'securite']);
 const L = {
   unknownHg: { fr: (t: string) => `Matériel générique (HG) inconnu : ${t}`, en: (t: string) => `Unknown Hardware Generic (HG): ${t}` },
   kmNoReverse: { fr: 'Commande par contacteur (KM) : marche arrière impossible', en: 'Contactor control (KM): reverse not possible' },
+  dockedNoReverse: { fr: 'Machine posée sur un convoyeur : pas de marche arrière', en: 'Machine on a conveyor: no reverse' },
   reverseOff: { fr: "Marche arrière non autorisée (option de l'équipement [EQ])", en: 'Reverse not allowed (Equipment [EQ] option)' },
   negative: { fr: 'négative', en: 'negative' },
   main: { fr: 'principale', en: 'main' },
@@ -127,6 +128,8 @@ export const isKM = (eq: Eq) => eq.hg.some((h) => h.type === 'KM');
 
 /** Marche arrière : grisée si la commande est un KM, sinon soumise à l'option du bloc EQ (texte à marqueurs, voir L). */
 export function reverseBlocked(eq: Eq): string | null {
+  // Machine posée sur un convoyeur : pas de marche arrière.
+  if (eq.dockedTo) return tx(L.dockedNoReverse);
   if (isKM(eq)) return tx(L.kmNoReverse);
   if (!eq.options.reverseAllowed) return tx(L.reverseOff);
   return null;

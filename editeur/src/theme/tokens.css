@@ -114,6 +114,11 @@
 --pid-bg:#565d59;
 --pid-out:#2b302e;
 --pid-tile:#3b4340;
+--pid-body:#323937;
+--pid-edge:#aab3ad;
+--pid-heap:#4b534f;
+--pid-dock:#46504b;
+--pid-out-name:#a7afa9;
 --pid-card:#2f3634;
 --pid-band:#2d3330;
 --pid-chute:#2a302d;
@@ -130,7 +135,7 @@
 --pid-fault-stroke:#ff9a90;
 --pid-warn:#efb04a;
 --pid-select:var(--abi-green);
---font-tag:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+--font-tag:"Atkinson Hyperlegible Mono",ui-monospace,Consolas,monospace;
 /* Couleur de lien par type de sortie : PROPOSITION à valider (docs/05-points-ouverts.md). */
 --out-1:#d3d8d3;
 --out-2:#6db4e6;

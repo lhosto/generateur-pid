@@ -60,7 +60,11 @@ const L = {
 
 // Nom affiché des formes de base (la clé reste l'identifiant interne de symbols.ts).
 const BASE_LABELS: Record<Base, Entry> = {
-  pill: { fr: 'oblong', en: 'pill' },
+  pill: { fr: 'rouleau (convoyage)', en: 'roller (conveying)' },
+  flare: { fr: 'évasée (séparation)', en: 'flared (separation)' },
+  heap: { fr: 'trémie et tas (dosage)', en: 'hopper and heap (dosing)' },
+  crusher: { fr: 'trémie (broyage)', en: 'hopper (shredding)' },
+  frame: { fr: 'cadre pointillé (divers)', en: 'dashed frame (misc.)' },
   card: { fr: 'rectangle', en: 'rectangle' },
   screen: { fr: 'crible', en: 'screen' },
   grid: { fr: 'grille', en: 'grid' },

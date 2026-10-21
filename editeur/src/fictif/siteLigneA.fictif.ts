@@ -1,5 +1,5 @@
 // Site PROTOTYPE transcrit à la main d'un PID réel (ligne A : E-IN, I-Ligne A, J-OUT, K-OUT), pour
-// éprouver l'éditeur sur une vraie densité. Positions reprises de l'image (coordonnées × 1,45).
+// éprouver l'éditeur sur une vraie densité. Positions reprises de l'image (coordonnées × 1,75 unités).
 // Repère client = numéro du haut (090), repère Aktid = libellé du bas (05b). Correspondance des formes
 // PROVISOIRE : ronds → convoyeur, overband à aimant → OVPM, « L » à sorties −/+ → trieur optique,
 // losange → BYPA, colonnes colorées → cabine de tri, trémie → DOBU, broyeur → SHRE, bennes B0xx → silo.
@@ -11,8 +11,8 @@ import { dockOnDrop } from '../model/dock';
 import { eqBox } from '../model/geometry';
 import type { Dir, Flow, Pivot } from '../model/pivot';
 
-const X = (x: number) => 40 + x * 1.45;
-const Y = (y: number) => 40 + y * 1.45;
+const X = (x: number) => 40 + x * 2;
+const Y = (y: number) => 40 + y * 2;
 
 export function siteLigneA(cat: Catalogue): Pivot {
   const start = emptyPivot(cat, 'Ligne A (prototype d’après PID)');

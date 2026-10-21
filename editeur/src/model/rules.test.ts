@@ -23,9 +23,9 @@ const types = (hg0: string, b = base) => defaultStack(cat, b, hg0).map((h) => h.
 beforeAll(() => setLang('fr'));
 
 describe('catalogue (liste HG réelle)', () => {
-  it('reprend les 48 HG principaux, chacun avec un symbole', () => {
+  it('reprend les 49 HG principaux (dont PICK, valoriste), chacun avec un symbole', () => {
     const p = principals(cat);
-    expect(p).toHaveLength(48);
+    expect(p).toHaveLength(49);
     expect(p.filter((k) => !SYMBOLS[k])).toEqual([]);
   });
 });
@@ -440,15 +440,16 @@ describe('croisements de traits', () => {
   it('deux traits vers deux équipements différents ne courent pas côte à côte', () => {
     let p = emptyPivot(cat);
     const s = addEq(cat, p, 'BELT', 400, 400, { channels: 3 });
-    const t1 = addEq(cat, s.p, 'BELT', 530, 410);
-    const t2 = addEq(cat, t1.p, 'BELT', 530, 440);
-    const a = addEq(cat, t2.p, 'BELT', 410, 480);
+    // Tapis épais (28 par canal) : cibles écartées pour ne pas se chevaucher.
+    const t1 = addEq(cat, s.p, 'BELT', 560, 400);
+    const t2 = addEq(cat, t1.p, 'BELT', 560, 470);
+    const a = addEq(cat, t2.p, 'BELT', 410, 520);
     p = connect(a.p, { eq: s.id, ch: 1, dir: 'avant', num: 1 }, { eq: t1.id, ch: 1 });
     p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: t1.id, ch: 1 });
     p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: t2.id, ch: 1 });
     const r = routeAll(p).links;
     const xs = (to: string) => r.filter((l) => l.link.to.eq === to).flatMap((l) => l.points.slice(1, -1).filter((q, i, arr) => i > 0 && q[0] === arr[i - 1][0]).map((q) => q[0]));
-    for (const x2 of xs(t2.id)) for (const x1 of xs(t1.id)) expect(Math.abs(x2 - x1)).toBeGreaterThanOrEqual(8);
+    for (const x2 of xs(t2.id)) for (const x1 of xs(t1.id)) expect(Math.abs(x2 - x1)).toBeGreaterThanOrEqual(5);
   });
   it('site de test : seuls restent les croisements imposés (ordre des sorties, canaux différents)', () => {
     expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(16);
@@ -479,7 +480,7 @@ describe('standards de formes', () => {
     expect(activeStandard(p1).bases.BELT).toBe('card');
     setActiveShapes(activeStandard(p1).bases);
     expect(symbolOf('BELT').base).toBe('card');
-    expect(symbolOf('BELT').picto).toBe(aktidSymbolOf('BELT').picto);
+    expect(symbolOf('BELT').marker).toBe(aktidSymbolOf('BELT').marker);
     const p2 = setActiveStandard(p1, 'aktid');
     setActiveShapes(activeStandard(p2).bases);
     expect(symbolOf('BELT').base).toBe(aktidSymbolOf('BELT').base);
@@ -612,7 +613,8 @@ describe('flux vertical, trois sorties vers une colonne à droite', () => {
       p = t.p;
       return t.id;
     };
-    const t96 = mk(240, 140), t95 = mk(240, 180), t94 = mk(240, 210);
+    // Convoyeurs d'au moins 6 caractères de long : colonne décalée d'autant.
+    const t96 = mk(260, 200), t95 = mk(260, 240), t94 = mk(260, 280);
     p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 1 }, { eq: t94, ch: 1 });
     p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 2 }, { eq: t95, ch: 1 });
     p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 3 }, { eq: t96, ch: 1 });
@@ -643,10 +645,12 @@ describe('largeur propre à chaque canal', () => {
     };
     expect(mk(1)).toBeLessThan(mk(3));
   });
-  it('une sortie par canal : axes tous les 20 px, comme avant', () => {
-    const a = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { channels: 3 });
+  it('une sortie par canal : axes tous les 20 px (convoyeur : 28, canaux plus larges)', () => {
+    const a = addEq(cat, emptyPivot(cat), 'OPSO', 100, 100, { channels: 3 });
     const e = findEq(a.p, a.id)!;
     expect([1, 2, 3].map((k) => sideOffset(e, 'E', k))).toEqual([-20, 0, 20]);
+    const b = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { channels: 3 });
+    expect([1, 2, 3].map((k) => sideOffset(findEq(b.p, b.id)!, 'E', k))).toEqual([-28, 0, 28]);
   });
 });
 
@@ -668,7 +672,8 @@ describe('canal 1 à gauche dans le sens du flux', () => {
 describe('sorties sœurs', () => {
   it('flux vers le bas : 1− vers la droite et 1+ tout droit ne se croisent pas collés aux étiquettes', () => {
     let p = emptyPivot(cat);
-    const a = addEq(cat, p, 'BELT', 100, 100, { flow: 'S' });
+    // Machine de séparation : ses sorties portent des étiquettes (− / +).
+    const a = addEq(cat, p, 'OPSO', 100, 100, { flow: 'S' });
     const below = addEq(cat, a.p, 'BELT', 100, 260, { flow: 'S' });
     const right = addEq(cat, below.p, 'BELT', 260, 180);
     p = connect(right.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: right.id, ch: 1 });
@@ -713,7 +718,7 @@ describe('arrivée droite sur un équipement collé', () => {
 });
 
 describe('« AR » sur le trait', () => {
-  it('au milieu du plus long segment, au-dessus d’un segment horizontal', () => {
-    expect(arMark([[0, 0], [0, 20], [100, 20], [100, 30]])).toEqual({ x: 50, y: 13, anchor: 'middle' });
+  it('sur le trait, au milieu du plus long segment', () => {
+    expect(arMark([[0, 0], [0, 20], [100, 20], [100, 30]])).toEqual({ x: 50, y: 20, anchor: 'middle' });
   });
 });

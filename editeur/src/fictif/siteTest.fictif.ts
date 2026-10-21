@@ -6,9 +6,11 @@ import type { Catalogue } from '../model/catalogue';
 import { addChute, addEq, addProximity, connect, emptyPivot, findEq, setChainType, takeOutput, type NewEqOpts } from '../model/ops';
 import type { Dir, Pivot } from '../model/pivot';
 import { straighten } from '../model/straighten';
+import { PX_PER_UNIT } from '../model/geometry';
 
-const X = (c: number) => 90 + c * 130;
-const Y = (r: number) => 110 + r * 110;
+// Positions pensées pour 1920 × 1080 px, ramenées en unités du dessin (voir PX_PER_UNIT).
+const X = (c: number) => Math.round((90 + c * 130) / PX_PER_UNIT / 10) * 10;
+const Y = (r: number) => Math.round((110 + r * 110) / PX_PER_UNIT / 10) * 10;
 
 export function siteTest(cat: Catalogue): Pivot {
   const start = emptyPivot(cat, 'Site de test (fictif)');
@@ -164,7 +166,7 @@ export function stressSite(cat: Catalogue): Pivot {
   for (let r = 0; r < 14; r++) {
     let prev: string | null = null;
     for (let c = 0; c < 14; c++) {
-      const made = addEq(cat, p, codes[(r + c) % codes.length], 70 + c * 134, 60 + r * 73, { zone: String.fromCharCode(65 + (r % 26)) });
+      const made = addEq(cat, p, codes[(r + c) % codes.length], (70 + c * 134) / PX_PER_UNIT, (60 + r * 73) / PX_PER_UNIT, { zone: String.fromCharCode(65 + (r % 26)) });
       p = made.p;
       if (prev) {
         const src = findEq(p, prev)!;
