@@ -1,5 +1,6 @@
 // Fichier pivot — format PROVISOIRE de maquette. Le format définitif est figé en semaine 1.
 import type { BaseSettings } from './catalogue';
+import type { ShapeStandard } from './symbols';
 
 export const PIVOT_FORMAT = 'pivot-provisoire-1';
 
@@ -93,6 +94,11 @@ export interface Pivot {
     catalogueVersion: string;
     modifiedAt: string;
     base: BaseSettings;
+    /**
+     * Standards de formes du site (facultatif : absent = Standard Aktid). `active` = id du standard
+     * affiché ; `standards` = standards créés (le Standard Aktid n'y figure pas, il est fixe).
+     */
+    shapes?: { active: string; standards: ShapeStandard[] };
   };
   equipments: Eq[];
   links: Link[];

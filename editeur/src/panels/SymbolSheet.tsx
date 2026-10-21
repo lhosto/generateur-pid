@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { etatLabel, principals, type Catalogue } from '../model/catalogue';
 import { boxAt, sizeOf } from '../model/geometry';
-import { GROUP_ORDER, groupLabel, symbolOf, type Base } from '../model/symbols';
+import { aktidSymbolOf, AKTID_STANDARD, BASES, GROUP_ORDER, groupLabel, symbolOf, type Base } from '../model/symbols';
+import { activeStandard, deleteStandard, duplicateStandard, renameStandard, setActiveStandard, setStandardBase, shapeStandards } from '../model/ops';
+import type { Pivot } from '../model/pivot';
 import { haloOf, labelPos, Shape, Tag } from '../canvas/symbols';
 import { Abbr, getLang, hgLabel, tx, type Entry } from '../i18n';
 import { Button, Icon, inputStyle, PanelHead } from '../ui/ui';
@@ -40,6 +42,16 @@ const L = {
     en: 'Click a card: this hardware will be offered in the “+” menu of Equipment items, after the conveyor.',
   },
   wincc: { fr: 'ID WinCC', en: 'WinCC ID' },
+  standard: { fr: 'Standard des formes', en: 'Shape standard' },
+  duplicateStd: { fr: 'Nouveau standard', en: 'New standard' },
+  duplicateStdTitle: { fr: 'Copie du standard affiché, pour en changer les formes', en: 'Copy of the displayed standard, to change its shapes' },
+  copyOf: { fr: (n: string) => 'Copie de ' + n, en: (n: string) => 'Copy of ' + n },
+  stdName: { fr: 'Nom du standard', en: 'Standard name' },
+  deleteStd: { fr: 'Supprimer ce standard', en: 'Delete this standard' },
+  aktidFixed: { fr: 'Référence fixe : dupliquer pour changer des formes.', en: 'Fixed reference: duplicate it to change shapes.' },
+  customHint: { fr: 'Changer la forme sous chaque carte ; le pictogramme reste.', en: 'Change the shape under each card; the pictogram stays.' },
+  shape: { fr: 'Forme', en: 'Shape' },
+  changed: { fr: 'modifiée', en: 'changed' },
   noEtat: { fr: 'état —', en: 'status —' },
   search: { fr: 'Chercher : code, nom, famille… (Entrée = premier résultat)', en: 'Search: code, name, family… (Enter = first result)' },
   none: { fr: (q: string) => `Aucun matériel ne correspond à « ${q} ».`, en: (q: string) => `No hardware matches “${q}”.` },
@@ -74,8 +86,10 @@ function Big({ hg0 }: { hg0: string }) {
   );
 }
 
-export function SymbolSheet({ cat, mode = 'browse', onClose, onPick }: { cat: Catalogue; mode?: 'browse' | 'pick'; onClose: () => void; onPick: (code: string) => void }) {
+export function SymbolSheet({ cat, pivot, commit, mode = 'browse', onClose, onPick }: { cat: Catalogue; pivot: Pivot; commit: (p: Pivot) => void; mode?: 'browse' | 'pick'; onClose: () => void; onPick: (code: string) => void }) {
   const [q, setQ] = useState('');
+  const std = activeStandard(pivot);
+  const editable = mode === 'browse' && std.id !== AKTID_STANDARD.id;
   // Recherche sans accents ni casse, sur le code, les libellés FR / EN et la famille ; tous les mots doivent figurer.
   const norm = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const words = norm(q).split(/\s+/).filter(Boolean);
@@ -104,6 +118,23 @@ export function SymbolSheet({ cat, mode = 'browse', onClose, onPick }: { cat: Ca
             {tx(L.shapes)} <strong style={{ color: 'var(--abi-orange-text)', fontWeight: 400 }}>{tx(L.toValidate)}</strong>
             {tx(L.report)} {tx(L.pick)}
           </p>
+        )}
+        {mode === 'browse' && (
+          // Standard des formes : Aktid (fixe) ou standard créé pour ce site, dont seules les formes changent.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border-divider)', flexWrap: 'wrap' }}>
+            <span style={{ font: '600 13px var(--font-sans)' }}>{tx(L.standard)}</span>
+            <select aria-label={tx(L.standard)} value={std.id} onChange={(e) => commit(setActiveStandard(pivot, e.target.value))} style={{ ...inputStyle, appearance: 'auto', width: 220, height: 30 }}>
+              {shapeStandards(pivot).map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            {editable && (
+              <input key={std.id} aria-label={tx(L.stdName)} defaultValue={std.name} onBlur={(e) => commit(renameStandard(pivot, std.id, e.target.value))} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); e.stopPropagation(); }} style={{ ...inputStyle, width: 200, height: 30 }} />
+            )}
+            <Button small icon="copy" title={tx(L.duplicateStdTitle)} onClick={() => commit(duplicateStandard(pivot, std.id, tx(L.copyOf, std.name)).p)}>{tx(L.duplicateStd)}</Button>
+            {editable && <Button small variant="stop" icon="trash" title={tx(L.deleteStd)} onClick={() => commit(deleteStandard(pivot, std.id))} />}
+            <span style={{ font: '400 12px var(--font-sans)', color: 'var(--text-muted)' }}>{tx(editable ? L.customHint : L.aktidFixed)}</span>
+          </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--border-divider)' }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: 520 }}>
@@ -135,8 +166,10 @@ export function SymbolSheet({ cat, mode = 'browse', onClose, onPick }: { cat: Ca
                   const name = hgLabel(d);
                   // Second nom : celui de l'autre langue de la liste HG, s'il diffère.
                   const alt = getLang() === 'en' ? d.label : d.labelEn;
+                  const changed = std.bases[k] !== undefined;
                   return (
-                    <button key={k} type="button" className="abi-row" onClick={() => onPick(k)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 6, background: 'var(--surface-nav)', border: '1px solid var(--border-nav)', textAlign: 'left', cursor: 'pointer' }}>
+                    <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <button type="button" className="abi-row" onClick={() => onPick(k)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 6, background: 'var(--surface-nav)', border: '1px solid var(--border-nav)', textAlign: 'left', cursor: 'pointer' }}>
                       <Big hg0={k} />
                       <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                         {/* Libellé d'abord, code HG (BELT…) en petit. */}
@@ -150,6 +183,18 @@ export function SymbolSheet({ cat, mode = 'browse', onClose, onPick }: { cat: Ca
                         </span>
                       </span>
                     </button>
+                    {editable && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', background: 'var(--surface-nav)', borderTop: '1px solid var(--border-divider)', font: '400 12px var(--font-sans)', color: 'var(--text-secondary)' }}>
+                        {tx(L.shape)}
+                        <select aria-label={`${tx(L.shape)} ${k}`} value={symbolOf(k).base} onChange={(e) => commit(setStandardBase(pivot, std.id, k, e.target.value as Base))} style={{ ...inputStyle, appearance: 'auto', height: 26, width: 170 }}>
+                          {BASES.map((b) => (
+                            <option key={b} value={b}>{tx(BASE_LABELS[b])}{b === aktidSymbolOf(k).base ? ' (Aktid)' : ''}</option>
+                          ))}
+                        </select>
+                        {changed && <span style={{ color: 'var(--abi-orange-text)' }}>{tx(L.changed)}</span>}
+                      </label>
+                    )}
+                    </div>
                   );
                 })}
               </div>

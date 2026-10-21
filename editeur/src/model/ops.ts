@@ -7,7 +7,7 @@ import {
   chainRepere, nextOutputNum, normalizeChain, suggestRepere, zoneOf, MAX, canAddChannel, canAddOutput,
   freeOutputNum, reverseBlocked,
 } from './rules';
-import { symbolOf } from './symbols';
+import { AKTID_STANDARD, aktidSymbolOf, symbolOf, type Base, type ShapeStandard } from './symbols';
 
 /** Pivot vide. Le nom est un titre libre (modifiable dans l'en-tête) : l'interface passe sa traduction. */
 export function emptyPivot(cat: Catalogue, name = 'Nouveau site'): Pivot {
@@ -31,10 +31,12 @@ export interface NewEqOpts {
   channels?: number;
   zone?: string;
   options?: Record<string, boolean | number>;
+  /** Commande imposée pour cet équipement (KM = départ direct, DRIV = variateur…), sinon celle des réglages de base. */
+  command?: BaseSettings['command'];
 }
 
 export function createEq(cat: Catalogue, p: Pivot, hg0: string, x: number, y: number, o: NewEqOpts = {}): Eq {
-  const base = p.site.base;
+  const base = o.command ? { ...p.site.base, command: o.command } : p.site.base;
   const hg = defaultStack(cat, base, hg0);
   return {
     id: uid('eq'),
@@ -119,7 +121,7 @@ export function placeNext(p: Pivot, src: Eq, dir: Dir, hg0: string, ch: number):
 }
 
 /** Geste « + » d'une sortie : crée la sortie, l'EQ suivant déjà raccordé et pré-rempli. */
-export function addOutputWithNext(cat: Catalogue, p: Pivot, eqId: string, ch: number, dir: Dir, hg0: string, at?: { x: number; y: number }): { p: Pivot; id: string | null } {
+export function addOutputWithNext(cat: Catalogue, p: Pivot, eqId: string, ch: number, dir: Dir, hg0: string, at?: { x: number; y: number }, command?: BaseSettings['command']): { p: Pivot; id: string | null } {
   const src = findEq(p, eqId);
   if (!src) return { p, id: null };
   // Le « + » ajoute toujours une nouvelle sortie (celle qu'il annonce) ; une sortie en attente se
@@ -128,7 +130,7 @@ export function addOutputWithNext(cat: Catalogue, p: Pivot, eqId: string, ch: nu
   if (!r.ref) return { p, id: null };
   const pos = at ?? placeNext(r.p, src, dir, hg0, ch);
   const flow = dir === 'avant' ? src.flow : opposite(src.flow);
-  const made = addEq(cat, r.p, hg0, pos.x, pos.y, { flow, zone: zoneOf(src.repere), repere: chainRepere(r.p, src, hg0) });
+  const made = addEq(cat, r.p, hg0, pos.x, pos.y, { flow, zone: zoneOf(src.repere), repere: chainRepere(r.p, src, hg0), command });
   return { p: connect(made.p, r.ref, { eq: made.id, ch: 1 }), id: made.id };
 }
 
@@ -329,3 +331,55 @@ export function setLinkTarget(p: Pivot, linkId: string, to: { eq: string; ch: nu
   return touch({ ...p, links: p.links.map((l: Link) => (l.id === linkId ? { ...l, to } : l)) });
 }
 
+
+// ---------- standards de formes ----------
+
+/** Standards disponibles : le Standard Aktid (fixe) puis ceux créés pour ce site. */
+export const shapeStandards = (p: Pivot): ShapeStandard[] => [AKTID_STANDARD, ...(p.site.shapes?.standards ?? [])];
+
+/** Standard de formes affiché (Standard Aktid par défaut). */
+export const activeStandard = (p: Pivot): ShapeStandard =>
+  shapeStandards(p).find((s) => s.id === (p.site.shapes?.active ?? AKTID_STANDARD.id)) ?? AKTID_STANDARD;
+
+const withShapes = (p: Pivot, active: string, standards: ShapeStandard[]): Pivot =>
+  touch({ ...p, site: { ...p.site, shapes: { active, standards } } });
+
+export function setActiveStandard(p: Pivot, id: string): Pivot {
+  if (!shapeStandards(p).some((s) => s.id === id)) return p;
+  return withShapes(p, id, p.site.shapes?.standards ?? []);
+}
+
+/** Nouveau standard : copie de `fromId` sous un nom libre, aussitôt affiché. */
+export function duplicateStandard(p: Pivot, fromId: string, name: string): { p: Pivot; id: string } {
+  const from = shapeStandards(p).find((s) => s.id === fromId) ?? AKTID_STANDARD;
+  const id = uid('std');
+  const std: ShapeStandard = { id, name: name.trim() || from.name, bases: { ...from.bases } };
+  return { p: withShapes(p, id, [...(p.site.shapes?.standards ?? []), std]), id };
+}
+
+export function renameStandard(p: Pivot, id: string, name: string): Pivot {
+  if (id === AKTID_STANDARD.id || !name.trim()) return p;
+  const list = (p.site.shapes?.standards ?? []).map((s) => (s.id === id ? { ...s, name: name.trim() } : s));
+  return withShapes(p, p.site.shapes?.active ?? AKTID_STANDARD.id, list);
+}
+
+/** Supprime un standard créé ; s'il était affiché, on revient au Standard Aktid. */
+export function deleteStandard(p: Pivot, id: string): Pivot {
+  if (id === AKTID_STANDARD.id) return p;
+  const list = (p.site.shapes?.standards ?? []).filter((s) => s.id !== id);
+  const active = p.site.shapes?.active === id ? AKTID_STANDARD.id : (p.site.shapes?.active ?? AKTID_STANDARD.id);
+  return withShapes(p, active, list);
+}
+
+/** Forme d'un HG principal dans un standard créé ; la forme Aktid (ou null) retire la substitution. */
+export function setStandardBase(p: Pivot, id: string, hg0: string, base: Base | null): Pivot {
+  if (id === AKTID_STANDARD.id) return p;
+  const list = (p.site.shapes?.standards ?? []).map((s) => {
+    if (s.id !== id) return s;
+    const bases = { ...s.bases };
+    if (!base || base === aktidSymbolOf(hg0).base) delete bases[hg0];
+    else bases[hg0] = base;
+    return { ...s, bases };
+  });
+  return withShapes(p, p.site.shapes?.active ?? AKTID_STANDARD.id, list);
+}

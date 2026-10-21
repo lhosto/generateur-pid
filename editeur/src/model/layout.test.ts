@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import catJson from '../catalogue.json';
 import type { Catalogue } from './catalogue';
 import { siteTest } from '../fictif/siteTest.fictif';
-import { overlapping, reorganize } from './layout';
+import { minGap, overlapping, reorganize } from './layout';
 import { routeAll } from './route';
 
 const cat = catJson as unknown as Catalogue;
@@ -25,5 +25,6 @@ describe('réorganiser (ELK)', () => {
     const { p: q } = await reorganize(mixed);
     expect(q.links).toEqual(p.links);
     expect(overlapping(q)).toBe(0);
+    expect(minGap(q)).toBeGreaterThanOrEqual(30);
   });
 });

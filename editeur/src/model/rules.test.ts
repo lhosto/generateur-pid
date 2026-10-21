@@ -4,10 +4,10 @@ import { siteTest } from '../fictif/siteTest.fictif';
 import { setLang } from '../i18n';
 import { align, distribute } from './align';
 import { principals, type Catalogue } from './catalogue';
-import { SYMBOLS } from './symbols';
+import { SYMBOLS, aktidSymbolOf, setActiveShapes, symbolOf } from './symbols';
 import { straighten } from './straighten';
 import { boxAt, eqBox } from './geometry';
-import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum, takeOutput, updateEq } from './ops';
+import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum, takeOutput, updateEq, activeStandard, duplicateStandard, setStandardBase, setActiveStandard, deleteStandard } from './ops';
 import type { Pivot } from './pivot';
 import { loopLinks, routeAll, shortTag } from './route';
 import {
@@ -436,5 +436,48 @@ describe('croisements de traits', () => {
   });
   it('site de test : seuls restent les croisements imposés (ordre des sorties, canaux différents)', () => {
     expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(9);
+  });
+});
+
+describe('convoyeur : départ direct ou variateur', () => {
+  it('la commande choisie est posée dans la pile', () => {
+    const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
+    const km = addOutputWithNext(cat, a.p, a.id, 1, 'avant', 'BELT', undefined, 'KM');
+    const dr = addOutputWithNext(cat, a.p, a.id, 1, 'avant', 'BELT', undefined, 'DRIV');
+    const types = (p: typeof km.p, id: string) => findEq(p, id)!.hg.map((h) => h.type);
+    expect(types(km.p, km.id!)).toContain('KM');
+    expect(types(dr.p, dr.id!)).toContain('DRIV');
+    expect(types(dr.p, dr.id!)).not.toContain('KM');
+  });
+});
+
+describe('standards de formes', () => {
+  it('Standard Aktid par défaut ; un standard créé ne change que la forme', () => {
+    const p0 = addEq(cat, emptyPivot(cat), 'BELT', 300, 300).p;
+    expect(activeStandard(p0).id).toBe('aktid');
+    const d = duplicateStandard(p0, 'aktid', 'Client X');
+    const p1 = setStandardBase(d.p, d.id, 'BELT', 'card');
+    expect(activeStandard(p1).bases.BELT).toBe('card');
+    setActiveShapes(activeStandard(p1).bases);
+    expect(symbolOf('BELT').base).toBe('card');
+    expect(symbolOf('BELT').picto).toBe(aktidSymbolOf('BELT').picto);
+    const p2 = setActiveStandard(p1, 'aktid');
+    setActiveShapes(activeStandard(p2).bases);
+    expect(symbolOf('BELT').base).toBe(aktidSymbolOf('BELT').base);
+    expect(activeStandard(deleteStandard(setActiveStandard(p1, d.id), d.id)).id).toBe('aktid');
+  });
+});
+
+describe('coudes des sorties d\'un même départ', () => {
+  it('1.1 vers le haut et 1.2 vers le bas coudent sur la même colonne', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 200);
+    const up = addEq(cat, a.p, 'BELT', 260, 150);
+    const down = addEq(cat, up.p, 'BELT', 300, 250);
+    p = connect(down.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: up.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: down.id, ch: 1 });
+    const r = routeAll(p).links;
+    const bendX = (to: string) => r.find((l) => l.link.to.eq === to)!.points[1][0];
+    expect(bendX(up.id)).toBe(bendX(down.id));
   });
 });

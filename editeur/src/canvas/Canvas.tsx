@@ -171,6 +171,9 @@ const L = {
   menuTitle: { fr: (r: string) => `Ajouter après ${r}`, en: (r: string) => `Add after ${r}` },
   menuDefault: { fr: 'par défaut', en: 'default' },
   menuLast: { fr: 'dernier choix', en: 'last choice' },
+  // Deux convoyeurs proposés : départ direct (contacteur KM) ou variateur (DRIV).
+  beltDirect: { fr: 'départ direct', en: 'direct-on-line' },
+  beltDrive: { fr: 'avec variateur', en: 'with drive' },
   numBar: { fr: (ch: number) => `Numéro de sortie (canal ${ch})`, en: (ch: number) => `Output number (channel ${ch})` },
   numHint: { fr: 'Les autres sorties du canal se décalent', en: 'The other outputs of the channel shift' },
   delLink: { fr: 'Supprimer le trait et sa sortie (Suppr)', en: 'Delete the link and its output (Del)' },
@@ -536,7 +539,7 @@ export function Canvas(props: Props) {
   };
 
   /** Crée l'équipement choisi dans le menu du « + », déjà raccordé à la sortie. */
-  const addFromMenu = (m: AddMenu, hg0: string) => {
+  const addFromMenu = (m: AddMenu, hg0: string, command?: 'KM' | 'DRIV') => {
     const pv = live.current.pivot;
     const src = findEq(pv, m.src.eq);
     setMenu(null);
@@ -551,10 +554,10 @@ export function Canvas(props: Props) {
       if (!exists || pv.links.some((l) => sameOutput(l.from, ref))) return;
       // Même sens que le « + » : une sortie arrière repart à contre-flux.
       const flow = ref.dir === 'avant' ? src.flow : opposite(src.flow);
-      const made = addEq(cat, pv, hg0, at[0], at[1], { flow, zone: zoneOf(src.repere), repere: chainRepere(pv, src, hg0) });
+      const made = addEq(cat, pv, hg0, at[0], at[1], { flow, zone: zoneOf(src.repere), repere: chainRepere(pv, src, hg0), command });
       next = { p: connect(made.p, ref, { eq: made.id, ch: 1 }), id: made.id };
     } else {
-      next = addOutputWithNext(cat, pv, src.id, m.src.ch, m.src.dir, hg0, m.at ? { x: m.at[0], y: m.at[1] } : undefined);
+      next = addOutputWithNext(cat, pv, src.id, m.src.ch, m.src.dir, hg0, m.at ? { x: m.at[0], y: m.at[1] } : undefined, command);
     }
     if (!next.id) return;
     props.commit(next.p);
@@ -955,8 +958,15 @@ export function Canvas(props: Props) {
       {menu && (() => {
         const src = findEq(pivot, menu.src.eq);
         if (!src) return null;
-        const items: { hg0: string; note: string }[] = [];
-        if (cat.hgTypes[DEFAULT_NEXT]?.principal) items.push({ hg0: DEFAULT_NEXT, note: tx(L.menuDefault) });
+        const items: { hg0: string; note: string; command?: 'KM' | 'DRIV'; variant?: string }[] = [];
+        if (cat.hgTypes[DEFAULT_NEXT]?.principal) {
+          // Convoyeur : deux choix de commande ; celui des réglages de base en tête, « par défaut ».
+          const both = (['KM', 'DRIV'] as const).filter((c) => cat.hgTypes[c]);
+          const first = both.includes(pivot.site.base.command as 'KM' | 'DRIV') ? (pivot.site.base.command as 'KM' | 'DRIV') : both[0];
+          for (const c of [first, ...both.filter((x) => x !== first)].filter(Boolean))
+            items.push({ hg0: DEFAULT_NEXT, command: c, variant: tx(c === 'KM' ? L.beltDirect : L.beltDrive), note: c === first ? tx(L.menuDefault) : '' });
+          if (!both.length) items.push({ hg0: DEFAULT_NEXT, note: tx(L.menuDefault) });
+        }
         if (props.currentNature !== DEFAULT_NEXT && cat.hgTypes[props.currentNature]) items.push({ hg0: props.currentNature, note: tx(L.menuLast) });
         const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '3px 10px 3px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#fff' };
         const pos = menuPos ?? { left: menu.x + 10, top: menu.y + 10 };
@@ -1001,13 +1011,14 @@ export function Canvas(props: Props) {
               <span style={{ ...TIP_STYLE.tech, marginLeft: 8 }}>{tx(L.outTitle, outNum, menu.src.dir === 'avant')}</span>
             </div>
             {items.map((it) => (
-              <button key={it.hg0} type="button" role="menuitem" className="abi-row" onClick={() => addFromMenu(menu, it.hg0)} style={row}>
+              <button key={it.hg0 + (it.command ?? '')} type="button" role="menuitem" className="abi-row" onClick={() => addFromMenu(menu, it.hg0, it.command)} style={row}>
                 <Glyph hg0={it.hg0} width={64} height={38} />
                 <span style={{ display: 'flex', flexDirection: 'column' }}>
                   {/* Libellé puis code HG en petit, juste après le mot qu'il nomme. */}
                   <span style={{ font: '500 13px var(--font-sans)' }}>
                     {hgLabel(cat.hgTypes[it.hg0])}
-                    <Abbr>{it.hg0}</Abbr>
+                    {it.variant && ` — ${it.variant}`}
+                    <Abbr>{it.command ? `${it.hg0} · ${it.command}` : it.hg0}</Abbr>
                   </span>
                   <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{it.note}</span>
                 </span>
@@ -1074,7 +1085,9 @@ function Handles(props: {
   if (isNoAction(props.cat, eq)) return null;
   const n = eq.channels.length;
   const blocked = reverseBlocked(eq);
-  const chip = (dir: Dir, ch: number, at: Pt) => {
+  const chip = (dir: Dir, ch: number, at: Pt, small = false) => {
+    const r = small ? 6 : 7.5;
+    const k = small ? 3 : 3.5;
     const ok = canAddOutput(eq, ch, dir);
     const num = nextOutputNum(eq, ch, dir);
     // Nouvelle sortie seulement quand toutes les sorties du canal sont raccordées.
@@ -1105,8 +1118,8 @@ function Handles(props: {
         style={{ cursor: ok ? 'pointer' : 'not-allowed', opacity: ok ? 1 : 0.3 }}
       >
         <circle cx={at[0]} cy={at[1]} r={11} fill="transparent" />
-        <circle cx={at[0]} cy={at[1]} r={7.5} fill="var(--pid-band)" stroke={ok ? 'var(--abi-green)' : '#6f7a74'} strokeWidth={1.5} strokeDasharray={dir === 'arriere' ? '2.5 2' : undefined} />
-        <path d={`M${at[0] - 3.5} ${at[1]} h7 M${at[0]} ${at[1] - 3.5} v7`} stroke={ok ? '#fff' : '#6f7a74'} strokeWidth={1.5} strokeLinecap="round" />
+        <circle cx={at[0]} cy={at[1]} r={r} fill="var(--pid-band)" stroke={ok ? 'var(--abi-green)' : '#6f7a74'} strokeWidth={small ? 1.4 : 1.5} strokeDasharray={dir === 'arriere' ? '2.5 2' : undefined} />
+        <path d={`M${at[0] - k} ${at[1]} h${2 * k} M${at[0]} ${at[1] - k} v${2 * k}`} stroke={ok ? '#fff' : '#6f7a74'} strokeWidth={1.5} strokeLinecap="round" />
         {n > 1 && ok && (
           // Numéro du canal à l'extérieur du « + », dans le sens de la sortie (pas sur le « + » voisin).
           <text x={at[0] + flowVec(dir === 'avant' ? eq.flow : opposite(eq.flow))[0] * 13} y={at[1] + flowVec(dir === 'avant' ? eq.flow : opposite(eq.flow))[1] * 13} textAnchor="middle" dominantBaseline="central" style={{ font: '600 8px var(--font-tag)', fill: 'var(--pid-caption)', pointerEvents: 'none' }}>
@@ -1174,8 +1187,8 @@ function Handles(props: {
   };
   return (
     <g>
-      {handlePositions(eq, box, 'avant').map((h) => chip('avant', h.ch, h.at))}
-      {handlePositions(eq, box, 'arriere').map((h) => chip('arriere', h.ch, h.at))}
+      {handlePositions(eq, box, 'avant').map((h) => chip('avant', h.ch, h.at, h.small))}
+      {handlePositions(eq, box, 'arriere').map((h) => chip('arriere', h.ch, h.at, h.small))}
       <g onPointerEnter={props.onEnter} onPointerLeave={props.onLeave} onPointerDown={props.onBodyDown} style={{ cursor: 'move' }}>
         <rect x={tx0} y={ty0} width={TW} height={TH} rx={TH / 2} fill="var(--pid-band)" stroke="#6f7a74" strokeWidth={1} />
         <text x={tx0 + TW / 2} y={ty0 + TH / 2} textAnchor="middle" dominantBaseline="central" style={{ font: '600 9.5px var(--font-sans)', fill: 'var(--pid-text)', pointerEvents: 'none' }}>

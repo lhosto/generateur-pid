@@ -31,9 +31,9 @@ function relation(a: Eq, ab: Box, chA: number, dir: Dir, b: Eq, bb: Box, chB: nu
  * Redresse les liens presque alignés (écart ≤ tol). Par composante de liens alignables, un EQ de
  * référence reste en place (celui qui a le plus de canaux, sinon le plus relié) et les autres prennent
  * l'axe du canal auquel ils sont reliés. Avec `only`, seuls ces EQ bougent. Un EQ qui chevaucherait
- * un autre reste en place. Rend le nouveau pivot.
+ * un autre (à moins de `margin`) reste en place. Rend le nouveau pivot.
  */
-export function straighten(p: Pivot, only?: Set<string>, tol = 40): Pivot {
+export function straighten(p: Pivot, only?: Set<string>, tol = 40, margin = 4): Pivot {
   const eqs = new Map(p.equipments.map((e) => [e.id, { ...e }]));
   for (const axis of ['y', 'x'] as const) {
     const edges: Edge[] = [];
@@ -104,7 +104,7 @@ export function straighten(p: Pivot, only?: Set<string>, tol = 40): Pivot {
           if (want !== ev[axis] && (!only || only.has(ev.id))) {
             const moved = { ...ev, [axis]: want };
             const mb = eqBox(moved);
-            const blocked = [...eqs.values()].some((o) => o.id !== ev.id && overlaps(eqBox(o), mb, 4));
+            const blocked = [...eqs.values()].some((o) => o.id !== ev.id && overlaps(eqBox(o), mb, margin));
             if (!blocked) eqs.set(ev.id, moved);
           }
           queue.push(n.other);

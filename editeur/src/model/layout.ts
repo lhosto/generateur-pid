@@ -5,7 +5,7 @@
 // FIXED_POS) : côté imposé par le flux, 1.2 à droite de 1.1, arrivée par l'arrière.
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type { ElkNode } from 'elkjs/lib/elk-api';
-import { boxAt, CHUTE_SIZE, eqBox, GRID, opposite, overlaps, sideOffset, snap, type Box } from './geometry';
+import { boxAt, CHUTE_SIZE, eqBox, SCREEN, GRID, opposite, overlaps, sideOffset, snap, type Box } from './geometry';
 import type { Flow, Pivot } from './pivot';
 import { anchor, channelAnchor, departureSide, portOffset } from './route';
 import { straighten } from './straighten';
@@ -13,6 +13,15 @@ import { setPositions } from './ops';
 
 const ELK_SIDE: Record<Flow, string> = { E: 'EAST', W: 'WEST', N: 'NORTH', S: 'SOUTH' };
 const ELK_DIR: Record<Flow, string> = { E: 'RIGHT', W: 'LEFT', N: 'UP', S: 'DOWN' };
+
+/**
+ * Écarts essayés (équipements d'une même colonne, entre colonnes), du plus aéré au plus serré : le
+ * premier qui tient dans l'écran 1920 × 1080 est gardé.
+ */
+const GAPS: [number, number][] = [[50, 90], [40, 75], [30, 60]];
+
+/** Écart en dessous duquel le redressage final ne rapproche pas deux équipements. */
+const MIN_GAP = 30;
 
 /** Marge autour du schéma réorganisé, dans l'écran 1920 × 1080. */
 const MARGIN = 60;
@@ -37,6 +46,15 @@ export interface LayoutResult {
  * complète) ; sur une sélection, elles ne bougent pas.
  */
 export async function reorganize(p: Pivot, only?: Set<string>): Promise<LayoutResult> {
+  let r: LayoutResult | null = null;
+  for (const [node, layer] of GAPS) {
+    r = await reorganizeWith(p, node, layer, only);
+    if (r.bounds.w <= SCREEN.w - 2 * MARGIN && r.bounds.h <= SCREEN.h - 2 * MARGIN) break;
+  }
+  return r!;
+}
+
+async function reorganizeWith(p: Pivot, gapNode: number, gapLayer: number, only?: Set<string>): Promise<LayoutResult> {
   const ids = new Set(p.equipments.filter((e) => !only || only.has(e.id)).map((e) => e.id));
   const eqs = p.equipments.filter((e) => ids.has(e.id));
   const boxes = new Map(eqs.map((e) => [e.id, eqBox(e)]));
@@ -77,11 +95,13 @@ export async function reorganize(p: Pivot, only?: Set<string>): Promise<LayoutRe
       'elk.algorithm': 'layered',
       'elk.direction': ELK_DIR[mainFlow(p, ids)],
       'elk.edgeRouting': 'ORTHOGONAL',
-      'elk.spacing.nodeNode': '40',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '60',
+      // Écarts réguliers et aérés : entre équipements d'une même colonne, entre colonnes, et autour des traits.
+      'elk.spacing.nodeNode': String(gapNode),
+      'elk.layered.spacing.nodeNodeBetweenLayers': String(gapLayer),
       'elk.spacing.edgeNode': '20',
       'elk.spacing.edgeEdge': '10',
-      'elk.layered.spacing.edgeNodeBetweenLayers': '20',
+      'elk.layered.spacing.edgeNodeBetweenLayers': '30',
+      'elk.layered.spacing.edgeEdgeBetweenLayers': '10',
       'elk.separateConnectedComponents': 'true',
       'elk.spacing.componentComponent': '60',
       // Ordre actuel conservé autant que possible (l'utilisateur garde la main sur la disposition).
@@ -106,8 +126,9 @@ export async function reorganize(p: Pivot, only?: Set<string>): Promise<LayoutRe
     pos[n.id] = { x: snap(origin.x + (n.x ?? 0) + b.w / 2), y: snap(origin.y + (n.y ?? 0) + b.h / 2) };
   }
   let next = setPositions(p, pos);
-  // Alignement fin sur les axes de canal (arrondi à la grille), sans chevauchement.
-  next = straighten(next, only ? ids : undefined);
+  // Alignement fin sur les axes de canal (arrondi à la grille) : petits ajustements seulement, pour
+  // garder les écarts donnés par ELK.
+  next = straighten(next, only ? ids : undefined, 12, MIN_GAP);
   const moved = [...next.equipments.filter((e) => ids.has(e.id)).map(eqBox), ...(only ? [] : next.chutes.map((c) => boxAt(c.x, c.y, CHUTE_SIZE.w, CHUTE_SIZE.h)))];
   const bounds: Box = {
     x0: Math.min(...moved.map((b) => b.x0)),
@@ -119,6 +140,19 @@ export async function reorganize(p: Pivot, only?: Set<string>): Promise<LayoutRe
   bounds.w = bounds.x1 - bounds.x0;
   bounds.h = bounds.y1 - bounds.y0;
   return { p: next, bounds };
+}
+
+/** Plus petit écart entre deux objets (équipements, goulottes) qui se font face. */
+export function minGap(p: Pivot): number {
+  const b = [...p.equipments.map(eqBox), ...p.chutes.map((c) => boxAt(c.x, c.y, CHUTE_SIZE.w, CHUTE_SIZE.h))];
+  let m = Infinity;
+  for (let i = 0; i < b.length; i++)
+    for (let j = i + 1; j < b.length; j++) {
+      const gx = Math.max(b[j].x0 - b[i].x1, b[i].x0 - b[j].x1);
+      const gy = Math.max(b[j].y0 - b[i].y1, b[i].y0 - b[j].y1);
+      m = Math.min(m, Math.max(gx, gy));
+    }
+  return m;
 }
 
 /** Équipements qui se chevauchent après réorganisation (contrôle). */

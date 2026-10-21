@@ -145,4 +145,34 @@ export const GROUP_LABELS: Record<string, Entry> = {
 export const groupLabel = (g: string) => (GROUP_LABELS[g] ? tx(GROUP_LABELS[g]) : g);
 
 /** HG principal sans visuel défini : forme neutre, signalée « symbole à définir ». */
-export const symbolOf = (hg0: string): SymbolSpec => SYMBOLS[hg0] ?? { base: 'unknown', group: 'Sans symbole' };
+/**
+ * Standard de formes : remplace la forme de base de certains HG principaux (le pictogramme reste).
+ * « Standard Aktid » = aucune substitution (formes de SYMBOLS) ; d'autres standards (un client…) se
+ * créent par duplication et ne changent que les formes.
+ */
+export interface ShapeStandard {
+  id: string;
+  name: string;
+  /** HG principal → forme de base qui remplace celle du standard Aktid. */
+  bases: Record<string, Base>;
+}
+
+export const AKTID_STANDARD: ShapeStandard = { id: 'aktid', name: 'Standard Aktid', bases: {} };
+
+/** Formes de base proposées dans un standard (« à définir » exclu). */
+export const BASES: Base[] = ['pill', 'card', 'screen', 'grid', 'diamond', 'para', 'circle', 'silo', 'hopper', 'cabinet', 'desk'];
+
+// Standard actif : posé par l'application à chaque rendu (comme la langue), lu par symbolOf.
+let active: Record<string, Base> = {};
+export const setActiveShapes = (bases: Record<string, Base>) => {
+  active = bases;
+};
+
+/** Visuel Aktid d'un HG principal, sans substitution du standard actif. */
+export const aktidSymbolOf = (hg0: string): SymbolSpec => SYMBOLS[hg0] ?? { base: 'unknown', group: 'Sans symbole' };
+
+export const symbolOf = (hg0: string): SymbolSpec => {
+  const s = aktidSymbolOf(hg0);
+  const b = active[hg0];
+  return b ? { ...s, base: b } : s;
+};

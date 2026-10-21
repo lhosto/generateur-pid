@@ -228,7 +228,7 @@ function simplify(pts: Pt[]): Pt[] {
  * côté, puis un L ou un Z dont le segment du milieu glisse pour éviter les équipements.
  * Rend null si aucun tracé libre n'est trouvé.
  */
-function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], others: Box[], bias: number, clear?: (pts: Pt[]) => boolean): Pt[] | null {
+function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], others: Box[], bias: number, clear?: (pts: Pt[]) => boolean, hint?: number): Pt[] | null {
   const [sx, sy] = flowVec(sSide);
   const [tx, ty] = flowVec(tSide);
   const p1: Pt = [s[0] + sx * 12, s[1] + sy * 12];
@@ -253,10 +253,16 @@ function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], other
     }
     return clear && !clear(full) ? null : full;
   };
-  const tries: Pt[][] = [
+  const tries: Pt[][] = [];
+  // Coude commun imposé (sorties d'un même départ) : essayé en premier, sur l'axe du départ.
+  if (hint !== undefined) {
+    if (isHorizontal(sSide)) tries.push([s, p1, [hint, p1[1]], [hint, p2[1]], p2, t]);
+    else tries.push([s, p1, [p1[0], hint], [p2[0], hint], p2, t]);
+  }
+  tries.push(
     [s, p1, [p2[0], p1[1]], p2, t],
     [s, p1, [p1[0], p2[1]], p2, t],
-  ];
+  );
   // Coude au plus près de l'arrivée (20 px avant l'équipement) ; place prise → recul par pas de 10 px
   // vers le départ. Même règle partout : l'écart entre traits voisins est toujours un multiple de 10.
   const dx = Math.sign(p2[0] - p1[0]) || 1;
@@ -328,14 +334,14 @@ function crossesNone(pts: Pt[], end: Pt, placed: Placed[]): boolean {
   return true;
 }
 
-function routeLink(a: End, b: End, obstacles: Box[], sSide: Flow, tSide: Flow, placed: Placed[] = []): Pt[] {
+function routeLink(a: End, b: End, obstacles: Box[], sSide: Flow, tSide: Flow, placed: Placed[] = [], hint?: number): Pt[] {
   const s0 = endAnchor(a, sSide);
   const t = channelAnchor(b.eq, b.box, tSide, b.ch);
   // Côtés imposés par le sens du flux. D'abord sans croiser aucun trait déjà tracé ; sinon on accepte
   // un croisement ; en dernier recours, de passer sur un équipement.
   return (
-    connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0, (pts) => crossesNone(pts, t, placed)) ??
-    connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0) ??
+    connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0, (pts) => crossesNone(pts, t, placed), hint) ??
+    connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0, undefined, hint) ??
     connectSides(s0, sSide, t, tSide, [], [], a.port ?? 0) ??
     simplify([s0, t])
   );
@@ -429,6 +435,27 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
   }
 
   const valid = p.links.filter((l) => eqs.has(l.from.eq) && eqs.has(l.to.eq));
+  // Coude commun des sorties d'un même départ (équipement, canal, sens) : celui de l'arrivée la plus
+  // proche (20 px avant elle), pour que les coudes des traits frères soient alignés.
+  const bends = new Map<string, number>();
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const src = eqs.get(g[0].from.eq);
+    if (!src) continue;
+    const side = departureSide(src, g[0].from.dir);
+    const [vx, vy] = flowVec(side);
+    const sb = boxes.get(src.id)!;
+    const start = vx ? (vx > 0 ? sb.x1 : sb.x0) + vx * 12 : (vy > 0 ? sb.y1 : sb.y0) + vy * 12;
+    const cands: number[] = [];
+    for (const l of g) {
+      const dst = eqs.get(l.to.eq);
+      if (!dst || dst.id === src.id) continue;
+      const db = boxes.get(dst.id)!;
+      const near = vx ? (vx > 0 ? db.x0 : db.x1) - vx * 20 : (vy > 0 ? db.y0 : db.y1) - vy * 20;
+      if ((near - start) * (vx || vy) > 0) cands.push(near);
+    }
+    if (cands.length >= 2) bends.set(`${src.id}|${g[0].from.ch}|${g[0].from.dir}`, (vx || vy) > 0 ? Math.min(...cands) : Math.max(...cands));
+  }
   const route = (l: Link, placed: Placed[]): Pt[] => {
     const src = eqs.get(l.from.eq)!;
     const dst = eqs.get(l.to.eq)!;
@@ -438,7 +465,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
       const sSide = l.from.dir === 'avant' ? src.flow : opposite(src.flow);
       return selfLoop(a.box, channelAnchor(src, a.box, sSide, a.ch), channelAnchor(src, a.box, opposite(sSide), b.ch), sSide);
     }
-    return routeLink(a, b, obstaclesFor(src.id, dst.id), departureSide(src, l.from.dir), arrivalSide(dst, a.box, b.box), placed);
+    return routeLink(a, b, obstaclesFor(src.id, dst.id), departureSide(src, l.from.dir), arrivalSide(dst, a.box, b.box), placed, bends.get(`${l.from.eq}|${l.from.ch}|${l.from.dir}`));
   };
   // 1re passe : chaque trait évite ceux déjà tracés. 2e et 3e passes : un trait qui croise encore est
   // retracé en tenant compte de tous les autres, gardé seulement s'il ne croise plus rien.
@@ -514,7 +541,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
  * canal n'a encore aucune sortie dans ce sens ; sinon décalée à droite (côté horizontal) ou en dessous
  * (côté vertical), là où viendra la sortie suivante, pour ne pas la confondre avec la sortie 1.
  */
-export function handlePositions(eq: Eq, box: Box, dir: Dir): { ch: number; at: Pt }[] {
+export function handlePositions(eq: Eq, box: Box, dir: Dir): { ch: number; at: Pt; small: boolean }[] {
   const side = dir === 'avant' ? eq.flow : opposite(eq.flow);
   const [vx, vy] = flowVec(side);
   return eq.channels.map((c, i) => {
@@ -522,10 +549,10 @@ export function handlePositions(eq: Eq, box: Box, dir: Dir): { ch: number; at: P
     const count = c.outputs.filter((o) => o.dir === dir).length;
     const used = count > 0;
     // À la place de la sortie suivante, un peu au-delà du bout des traits.
-    // Plusieurs canaux : pas de place entre les axes, le « + » s'éloigne au-delà des étiquettes.
-    const multi = eq.channels.length > 1;
-    const lat = used && !multi ? slot(eq, box, count, count + 1) : 0;
-    const out = !used ? 26 : multi ? 48 : 34;
-    return { ch: i + 1, at: [ax + vx * out + (vx === 0 ? lat : 0), ay + vy * out + (vy === 0 ? lat : 0)] as Pt };
+    // Canal déjà raccordé : petit « + » au bout de la place de la sortie suivante, comme celui d'une
+    // sortie en attente (même endroit, même taille).
+    const lat = used ? slot(eq, box, count, count + 1) : 0;
+    const out = used ? 16 : 26;
+    return { ch: i + 1, at: [ax + vx * out + (vx === 0 ? lat : 0), ay + vy * out + (vy === 0 ? lat : 0)] as Pt, small: used };
   });
 }

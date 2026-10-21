@@ -5,12 +5,13 @@ import { fakeReport, openPivot, savePivot } from './io/files';
 import { align, distribute, type AlignMode, type Axis } from './model/align';
 import { readEmbeddedCatalogue } from './model/catalogue';
 import { boxAt, CHUTE_SIZE, eqBox, SCREEN } from './model/geometry';
-import { addEq, deleteItems, duplicate, emptyPivot, findEq, moveItems, removeLink, removeOutput, setBase, setPositions } from './model/ops';
+import { activeStandard, addEq, deleteItems, duplicate, emptyPivot, findEq, moveItems, removeLink, removeOutput, setBase, setPositions } from './model/ops';
 import type { Pivot } from './model/pivot';
 import { incompleteReasons } from './model/rules';
 import { loadSaved, usePivotHistory } from './model/store';
 import { straighten } from './model/straighten';
 import { reorganize } from './model/layout';
+import { setActiveShapes } from './model/symbols';
 import { EqDrawer } from './panels/EqDrawer';
 import { AlignBar, BaseSettingsDialog, CatalogueBanner, ReportPanel } from './panels/Overlays';
 import { Palette } from './panels/Palette';
@@ -71,6 +72,7 @@ const L = {
   incomplete: { fr: (n: number) => n + ' incomplet' + (n > 1 ? 's' : ''), en: (n: number) => n + ' incomplete' },
   errors: { fr: (n: number) => n + ' erreur' + (n > 1 ? 's' : '') + ' de génération', en: (n: number) => n + ' generation error' + (n !== 1 ? 's' : '') },
   command: { fr: 'commande :', en: 'control:' },
+  shapes: { fr: 'Formes :', en: 'Shapes:' },
   // Commande vide = colonne « Superieur 1 » : même libellé que les réglages de base (Overlays, commandStd).
   listDefault: { fr: 'selon la liste (Superieur 1)', en: 'per list (Superieur 1)' },
   // Aide souris / clavier : dans l'infobulle du « ? », pour que le pied tienne sur un écran de 1366 px.
@@ -91,6 +93,8 @@ export function App() {
   const lang = useLang(); // tout l'arbre se re-rend au changement de langue
   const h = usePivotHistory(() => loadSaved() ?? siteTest(cat));
   const { pivot, commit } = h;
+  // Standard de formes du site : lu par symbolOf pendant tout le rendu (même principe que la langue).
+  setActiveShapes(activeStandard(pivot).bases);
   const [tab, setTab] = useState<Tab>('pid');
   const [sel, setSel] = useState<Selection>(EMPTY_SEL);
   const [view, setView] = useState<View>({ zoom: 0.6, px: 20, py: 30 });
@@ -380,6 +384,10 @@ export function App() {
           {base.cpu} · {tx(L.command)} {base.command ? base.command : tx(L.listDefault)}
           {base.command === 'DRIV' && drive ? ' ' + drive : ''}
         </span>
+        {/* Standard de formes affiché ; clic : planche des symboles, où on le change. */}
+        <button type="button" className="abi-link" onClick={() => setSheet({})} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}>
+          {tx(L.shapes)} {activeStandard(pivot).name}
+        </button>
         <span
           tabIndex={0}
           title={tx(L.help).split(' · ').join('\n')}
@@ -394,6 +402,8 @@ export function App() {
       {sheet && (
         <SymbolSheet
           cat={cat}
+          pivot={pivot}
+          commit={commit}
           mode={sheet.pick ? 'pick' : 'browse'}
           onClose={() => setSheet(null)}
           onPick={(k) => {
