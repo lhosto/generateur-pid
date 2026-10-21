@@ -174,6 +174,13 @@ export function removeOutput(p: Pivot, ref: OutputRef): Pivot {
 
 /** Donne à une sortie le numéro voulu (ex. la mettre en sortie 1) ; les autres se décalent. */
 export function setOutputNum(p: Pivot, ref: OutputRef, num: number): Pivot {
+  // Le trait prend la place d'une sortie en attente (non reliée) : celle-ci disparaît, rien à décaler.
+  const linked = (n: number) => p.links.some((l) => l.from.eq === ref.eq && l.from.ch === ref.ch && l.from.dir === ref.dir && l.from.num === n);
+  const target = numsOf(p, ref.eq, ref.ch, ref.dir).includes(num) && num !== ref.num && !linked(num);
+  if (target && linked(ref.num)) {
+    const q = removeOutput(p, { ...ref, num });
+    return setOutputNum(q, { ...ref, num: ref.num > num ? ref.num - 1 : ref.num }, num);
+  }
   const order = numsOf(p, ref.eq, ref.ch, ref.dir).filter((n) => n !== ref.num);
   if (order.length + 1 < num || num < 1) return p;
   order.splice(num - 1, 0, ref.num);

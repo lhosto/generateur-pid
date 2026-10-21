@@ -285,6 +285,13 @@ describe('numéros de sortie', () => {
     expect([numTo(q, ids[1]), numTo(q, ids[2])]).toEqual([1, 2]);
     expect(findEq(q, q.links[0].from.eq)!.channels[0].outputs.map((o) => o.num).sort()).toEqual([1, 2]);
   });
+  it('mettre le trait de la sortie 2 sur une sortie 1 en attente : la sortie vide disparaît', () => {
+    const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
+    const r = addOutputWithNext(cat, a.p, a.id, 1, 'avant', 'BELT');
+    const q = setOutputNum(r.p, r.p.links[0].from, 1);
+    expect(findEq(q, a.id)!.channels[0].outputs).toEqual([{ dir: 'avant', num: 1 }]);
+    expect(q.links[0].from.num).toBe(1);
+  });
   it('mettre une sortie en 1 décale les autres', () => {
     const { p, ids } = three();
     const ref = p.links.find((l) => l.to.eq === ids[2])!.from;

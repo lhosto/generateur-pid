@@ -12,6 +12,7 @@ import { outputColor } from '../model/route';
 import {
   alternativesAt, canAddChannel, canAddOutput, chainOf, hgDef, hgName, hsLabel, hsName, incompleteReasons, isFirstChannel, isNoAction, MAX,
   optionLabel, outputsOf, pad2, polarity, proximityChoices, proximityOf, repereUsers, reverseBlocked,
+  freeOutputNum,
 } from '../model/rules';
 import { Button, Field, Icon, inputStyle, SectionHead, Toggle } from '../ui/ui';
 import { Glyph } from './Palette';
@@ -36,7 +37,6 @@ const L = {
     fr: (who: string, n: number) => `Déjà utilisé par ${n > 1 ? `${n} équipements` : 'l’équipement'} ${who}`,
     en: (who: string, n: number) => `Already used by ${n > 1 ? `${n} Equipment items` : 'Equipment item'} ${who}`,
   },
-  repereHint: { fr: 'Nomme les blocs TIA', en: 'Names the TIA blocks' },
   aktid: { fr: 'Repère Aktid', en: 'Aktid tag' },
   descriptif: { fr: 'Descriptif', en: 'Description' },
   // Libellé + HG0 en petit : sans espace avant le terme, il ne se coupe qu'après « Matériel ».
@@ -53,10 +53,6 @@ const L = {
   up: { fr: 'Vers le haut', en: 'Upwards' },
   // Pile de matériels génériques
   stack: { fr: 'Pile de matériels génériques', en: 'Hardware Generic stack' },
-  stackNote: {
-    fr: (u: string) => `Le niveau 0, matériel principal [HG0], agit sur la matière${u ? ' (consigne en ' + u + ')' : ''} ; les niveaux au-dessus suivent la liste des matériels génériques.`,
-    en: (u: string) => `Level 0, the main Hardware Generic [HG0], acts on the material${u ? ' (setpoint in ' + u + ')' : ''}; upper levels follow the Hardware Generic list.`,
-  },
   levelType: { fr: (i: number) => 'Type du matériel générique, niveau ' + i, en: (i: number) => 'Hardware Generic type, level ' + i },
   hsOf: { fr: (n: string) => 'Matériel spécifique [HS] de ' + n, en: (n: string) => 'Hardware Specific [HS] for ' + n },
   choose: { fr: '— choisir —', en: '— select —' },
@@ -66,7 +62,6 @@ const L = {
   },
   // Matériels de proximité
   prox: { fr: 'Matériels de proximité', en: 'Proximity hardware' },
-  proxRight: { fr: 'options de la liste des matériels génériques', en: 'options from the Hardware Generic list' },
   add: { fr: (label: string, on: string) => `Ajouter ${label} (option de ${on})`, en: (label: string, on: string) => `Add ${label} (option of ${on})` },
   noProx: { fr: 'Aucun matériel de proximité prévu pour cette pile', en: 'No proximity hardware available for this stack' },
   safetySide: { fr: 'Côté sécurité', en: 'Safety side' },
@@ -77,14 +72,9 @@ const L = {
   remove: { fr: (n: string) => 'Retirer ' + n, en: (n: string) => 'Remove ' + n },
   // Options du bloc équipement
   eqOptions: { fr: 'Options du bloc équipement', en: 'Equipment block options' },
-  eqOptionsRight: { fr: 'entrées du bloc TIA', en: 'TIA block inputs' },
   kmBlocked: { fr: 'Commande par contacteur (KM) : marche arrière impossible', en: 'Contactor control (KM): reverse not possible' },
   kmGrey: { fr: ' — bloqué (contacteur KM)', en: ' — blocked (KM contactor)' },
   // Consignes
-  setpoints: { fr: 'Consignes', en: 'Setpoints' },
-  setpointsFrom: { fr: (n: number, max: number) => `${n}/${max} · selon les matériels`, en: (n: number, max: number) => `${n}/${max} · from the hardware` },
-  noSetpoint: { fr: 'Aucune consigne', en: 'No setpoint' },
-  defaultOf: { fr: (n: string) => 'Valeur par défaut de ' + n, en: (n: string) => 'Default value of ' + n },
   // Canaux et sorties
   channels: { fr: 'Canaux et sorties', en: 'Channels and outputs' },
   channel: { fr: 'Canal', en: 'Channel' },
@@ -162,7 +152,6 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
     const who = users.map((u) => `${u.repere || '?'}${u.descriptif ? ` (${u.descriptif})` : ''}`).join(', ');
     return <span style={{ color: 'var(--pid-warn)' }}>{tx(L.dupUsed, who, users.length)}</span>;
   };
-  const unit = d0.setpoints?.[0]?.unit;
   const eqName = (id: string) => findEq(pivot, id)?.repere ?? '?';
 
   return (
@@ -208,7 +197,7 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
         )}
 
         <SectionHead title={tx(L.identity)} />
-        <Field label={tx(L.repere)} hint={dupHint('client', eq.repere) ?? tx(L.repereHint)}>
+        <Field label={tx(L.repere)} hint={dupHint('client', eq.repere)}>
           <input aria-label={tx(L.repere)} aria-invalid={!!dupHint('client', eq.repere)} value={eq.repere} onChange={(e) => set({ repere: e.target.value.trim() })} style={{ ...inputStyle, fontFamily: 'var(--font-tag)', ...(dupHint('client', eq.repere) ? DUP_INPUT : {}) }} />
         </Field>
         <Field label={tx(L.aktid)} hint={dupHint('aktid', eq.repereAktid)}>
@@ -216,13 +205,6 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
         </Field>
         <Field label={tx(L.descriptif)}>
           <input aria-label={tx(L.descriptif)} value={eq.descriptif} onChange={(e) => set({ descriptif: e.target.value })} style={inputStyle} />
-        </Field>
-        <Field label={<>{tx(L.hg0)}<Abbr>HG0</Abbr></>} hint={tx(L.hg0Hint, d0.idWinCC ?? '—', etatLabel(d0.etat) || '—')}>
-          <select aria-label={tx(L.hg0Aria)} value={hg0} onChange={(e) => commit(changeHg0(cat, pivot, eq.id, e.target.value))} style={selectStyle}>
-            {principals(cat).map((k) => (
-              <option key={k} value={k}>{k} — {hgLabel(cat.hgTypes[k])}</option>
-            ))}
-          </select>
         </Field>
         <Field label={tx(L.flow)}>
           <span style={{ display: 'flex', gap: 4 }}>
@@ -234,46 +216,59 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
           </span>
         </Field>
 
-        {/* À droite de l'en-tête : en-tête de la colonne des sélecteurs HS. */}
-        <SectionHead title={<>{tx(L.stack)}<Abbr>HG</Abbr></>} right={<Term k="hs" />} />
-        <div style={{ padding: '0 10px 6px', color: 'var(--text-muted)', font: '400 12px/1.4 var(--font-sans)' }}>{rich(tx(L.stackNote, unit ?? ''))}</div>
+        {/* À droite de l'en-tête : en-tête de la colonne des sélecteurs HS, alignée sur la grille. */}
+        <SectionHead title={<>{tx(L.stack)}<Abbr>HG</Abbr></>} right={<span style={{ display: 'inline-block', width: 174, textAlign: 'left' }}><Term k="hs" /></span>} />
+        {/* Grille alignée : niveau · matériel générique · matériel spécifique. Le HG0 (principal) en tête, mis en avant. */}
         {chain.map((h, i) => {
           const d = hgDef(cat, h.type);
           const alts = alternativesAt(cat, eq, i);
           const hsDef = d.hs.find((x) => x.id === h.hs);
+          const main = i === 0;
           return (
-            <Row key={h.id}>
-              <span style={{ width: 24, font: '600 12px var(--font-tag)', color: i === 0 ? 'var(--abi-green)' : 'var(--text-muted)' }}>{i === 0 ? 'HG0' : i}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {alts.length > 1 ? (
-                    <select aria-label={tx(L.levelType, i)} value={h.type} onChange={(e) => commit(setChainType(cat, pivot, eq.id, i, e.target.value))} style={{ ...selectStyle, width: '100%', height: 26 }}>
-                      {alts.map((t) => (
-                        <option key={t} value={t}>{t} — {hgLabel(hgDef(cat, t))}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span style={{ font: '400 13px var(--font-sans)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.type} — {hgLabel(d)}</span>
-                  )}
-                </div>
-                <div className="mono" style={{ font: '400 11px var(--font-tag)', color: 'var(--text-muted)', marginTop: 2 }}>{hsName(eq, h) ?? hgName(eq, h)}</div>
+            <div
+              key={h.id}
+              style={{
+                display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr) 150px 16px', columnGap: 8, alignItems: 'center',
+                padding: main ? '8px 10px' : '5px 10px', borderBottom: '1px solid #4a4a4a',
+                background: main ? 'var(--surface-nav-active)' : undefined, borderLeft: main ? '3px solid var(--abi-green)' : '3px solid transparent',
+              }}
+            >
+              <span style={{ font: `600 ${main ? 13 : 12}px var(--font-tag)`, color: main ? 'var(--abi-green)' : 'var(--text-muted)' }}>{main ? 'HG0' : i}</span>
+              <div style={{ minWidth: 0 }}>
+                {main ? (
+                  <select aria-label={tx(L.hg0Aria)} title={plain(tx(L.hg0Hint, d0.idWinCC ?? '—', etatLabel(d0.etat) || '—'))} value={hg0} onChange={(e) => commit(changeHg0(cat, pivot, eq.id, e.target.value))} style={{ ...selectStyle, width: '100%', height: 30, fontWeight: 600, fontSize: 14 }}>
+                    {principals(cat).map((k) => (
+                      <option key={k} value={k}>{k} — {hgLabel(cat.hgTypes[k])}</option>
+                    ))}
+                  </select>
+                ) : alts.length > 1 ? (
+                  <select aria-label={tx(L.levelType, i)} value={h.type} onChange={(e) => commit(setChainType(cat, pivot, eq.id, i, e.target.value))} style={{ ...selectStyle, width: '100%', height: 26 }}>
+                    {alts.map((t) => (
+                      <option key={t} value={t}>{t} — {hgLabel(hgDef(cat, t))}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ font: '400 13px var(--font-sans)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 5px' }}>{h.type} — {hgLabel(d)}</div>
+                )}
+                <div className="mono" style={{ font: '400 11px var(--font-tag)', color: 'var(--text-muted)', marginTop: 2, padding: '0 5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hsName(eq, h) ?? hgName(eq, h)}</div>
               </div>
-              {d.hs.length > 0 && (
-                <select aria-label={plain(tx(L.hsOf, hgName(eq, h)))} value={h.hs ?? ''} onChange={(e) => commit(setHs(pivot, eq.id, h.id, e.target.value))} style={{ ...selectStyle, width: 150, flex: 'none', height: 26 }}>
+              {d.hs.length > 0 ? (
+                <select aria-label={plain(tx(L.hsOf, hgName(eq, h)))} value={h.hs ?? ''} onChange={(e) => commit(setHs(pivot, eq.id, h.id, e.target.value))} style={{ ...selectStyle, width: '100%', height: main ? 30 : 26, alignSelf: 'start' }}>
                   {!h.hs && <option value="">{tx(L.choose)}</option>}
                   {d.hs.map((x) => (
                     <option key={x.id} value={x.id}>{hsLabel(x)}</option>
                   ))}
                 </select>
+              ) : (
+                <span />
               )}
-              {hsDef?.safetyTwin && <span title={plain(tx(L.safetyTwin, hsDef.safetyTwin))} style={{ font: '700 10px var(--font-sans)', color: '#cfe', background: 'var(--abi-tint-blue)', padding: '3px 5px' }}>F</span>}
-            </Row>
+              {hsDef?.safetyTwin ? <span title={plain(tx(L.safetyTwin, hsDef.safetyTwin))} style={{ font: '700 10px var(--font-sans)', color: '#cfe', background: 'var(--abi-tint-blue)', padding: '3px 4px', textAlign: 'center' }}>F</span> : <span />}
+            </div>
           );
         })}
 
         <SectionHead
           title={<>{tx(L.prox)}<Abbr>HG</Abbr></>}
-          right={<span>{tx(L.proxRight)}</span>}
         />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '0 10px 6px' }}>
           {proximityChoices(cat, eq).map((c) => (
@@ -308,7 +303,7 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
 
         {!isCab && (
           <>
-            <SectionHead title={<>{tx(L.eqOptions)}<Abbr>EQ</Abbr></>} right={<span>{tx(L.eqOptionsRight)}</span>} />
+            <SectionHead title={<>{tx(L.eqOptions)}<Abbr>EQ</Abbr></>} />
             {cat.eqOptions.map((o) => {
               const disabled = o.rule === 'reverse' && eq.hg.some((h) => h.type === 'KM');
               const v = eq.options[o.id] ?? o.default;
@@ -330,22 +325,6 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
               );
             })}
 
-            {/* Une seule mention HG par section : la pile la porte déjà, pas ici. */}
-            <SectionHead title={tx(L.setpoints)} right={<span>{tx(L.setpointsFrom, eq.setpoints.length, MAX.setpoints)}</span>} />
-            {eq.setpoints.length === 0 && <div style={{ padding: '2px 10px', color: 'var(--text-muted)', font: '400 13px var(--font-sans)' }}>{tx(L.noSetpoint)}</div>}
-            {eq.setpoints.map((s, i) => (
-              <Row key={i}>
-                <span style={{ flex: 1, font: '400 13px var(--font-sans)' }}>{s.name}</span>
-                <input
-                  aria-label={tx(L.defaultOf, s.name)}
-                  type="number"
-                  value={s.value}
-                  onChange={(e) => set({ setpoints: eq.setpoints.map((x, j) => (j === i ? { ...x, value: Number(e.target.value) } : x)) })}
-                  style={{ ...inputStyle, width: 90, height: 26 }}
-                />
-                <span style={{ width: 54, color: 'var(--text-muted)', font: '400 12px var(--font-sans)' }}>[{s.unit}]</span>
-              </Row>
-            ))}
 
             <SectionHead
               title={<>{tx(L.channels)}<Abbr>CH</Abbr></>}
@@ -377,7 +356,8 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
                   </div>
                   {(['avant', 'arriere'] as Dir[]).map((dir) => {
                     const outs = outputsOf(eq, ch, dir);
-                    const can = canAddOutput(eq, ch, dir);
+                    // Nouvelle sortie seulement quand toutes celles du canal sont raccordées.
+                    const can = canAddOutput(eq, ch, dir) && freeOutputNum(pivot, eq, ch, dir) === null;
                     return (
                       <div key={dir}>
                         {outs.map((o) => {

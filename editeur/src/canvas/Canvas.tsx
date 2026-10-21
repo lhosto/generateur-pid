@@ -12,7 +12,7 @@ import {
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
 import { handlePositions, loopLinks, outputColor, outputTag, placeTags, shortTag, routeAll, tagAnchor, type Pt } from '../model/route';
 import {
-  canAddChannel, canAddOutput, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
+  canAddChannel, canAddOutput, freeOutputNum, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
   chainRepere, zoneOf,
 } from '../model/rules';
 import { Icon } from '../ui/ui';
@@ -856,6 +856,7 @@ export function Canvas(props: Props) {
               onTip={pointerTip}
               onTipEnd={() => setTip(null)}
               onWire={startWire}
+              pending={new Set(handleTarget.channels.flatMap((_, ci) => (['avant', 'arriere'] as Dir[]).filter((dir) => freeOutputNum(pivot, handleTarget, ci + 1, dir) !== null).map((dir) => `${ci + 1}|${dir}`)))}
               incomingLast={pivot.links.filter((l) => l.to.eq === handleTarget.id && l.to.ch === handleTarget.channels.length).length}
               others={[...boxes.entries()].filter(([id]) => id !== handleTarget.id).map(([, b]) => b)}
               onAddChannel={() => props.commit(addChannel(pivot, handleTarget.id))}
@@ -1060,6 +1061,8 @@ function Handles(props: {
   onTipEnd: () => void;
   onWire: (e: React.PointerEvent, src: { eq: string; ch: number; dir: Dir }, origin: Pt) => void;
   incomingLast: number;
+  /** Canaux et sens (« 1|avant ») qui ont déjà une sortie en attente : pas de « + » nouvelle sortie. */
+  pending: Set<string>;
   /** Boîtes des autres équipements : l'onglet des canaux se pose là où il ne les recouvre pas. */
   others: Box[];
   onAddChannel: () => void;
@@ -1074,7 +1077,8 @@ function Handles(props: {
   const chip = (dir: Dir, ch: number, at: Pt) => {
     const ok = canAddOutput(eq, ch, dir);
     const num = nextOutputNum(eq, ch, dir);
-    if (num === null) return null;
+    // Nouvelle sortie seulement quand toutes les sorties du canal sont raccordées.
+    if (num === null || props.pending.has(`${ch}|${dir}`)) return null;
     const lines: TipLine[] = ok
       ? [
           { text: tx(L.outTitle, num, dir === 'avant'), kind: 'title' },

@@ -38,3 +38,5 @@
 | Taille selon les canaux | Plus de canaux = forme plus épaisse, jamais plus longue | Décidé | 21/10/2026 |
 | Traits parallèles | Deux traits vers des équipements différents restent à 8 px au moins l'un de l'autre ; vers le même point d'arrivée, ils se rejoignent | Décidé | 21/10/2026 |
 | Réorganiser (ELK) | Essai sur la branche essai/routage-libavoid-elk : bouton « Réorganiser » (tout, ou la sélection dès 2 EQ) ; ELK place les EQ en colonnes dans le sens du flux, les traits restent ceux de l'utilisateur et sont redessinés par le routage maison ; goulottes rangées à part ; annulable. +1,5 Mo dans le HTML. Prévu V2 au cahier des charges : à garder en V1 ? | | |
+| Ajout d'une sortie | « + » nouvelle sortie (PID et fiche) proposé seulement quand toutes les sorties du canal dans ce sens sont raccordées. Mettre un trait sur le numéro d'une sortie en attente supprime cette sortie vide | Décidé | 21/10/2026 |
+| Fiche équipement | Matériel principal (HG0) choisi en tête de la pile, mis en avant ; pile en grille HG / HS alignée ; consignes retirées de la fiche (toujours dans le pivot, valeurs par défaut du catalogue) ; textes d'aide réduits | Décidé | 21/10/2026 |
