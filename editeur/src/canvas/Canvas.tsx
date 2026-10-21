@@ -744,6 +744,15 @@ export function Canvas(props: Props) {
                       </text>
                     );
                   })()}
+                  {loops.has(l.id) && l.points.length >= 3 && (() => {
+                    // Boucle : gros ↺ au dernier coude, là où le trait rejoint son arrivée (souvent sur un autre trait).
+                    const [x, y] = l.points[l.points.length - 2];
+                    return (
+                      <text x={x + 7} y={y - 7} textAnchor="start" dominantBaseline="central" style={{ ...TAG_STYLE, font: '700 14px var(--font-tag)', fill: on ? 'var(--pid-select)' : 'var(--pid-text)', pointerEvents: 'none' }}>
+                        ↺
+                      </text>
+                    );
+                  })()}
                 </g>
               );
             })}
@@ -835,13 +844,13 @@ export function Canvas(props: Props) {
                   <g>
                     <rect x={b.x0 - 6} y={b.y0 - 6} width={b.w + 12} height={b.h + 12} rx={7} fill="none" stroke="var(--pid-select)" strokeWidth={2} />
                     {n > 1 && <rect x={band.x} y={band.y} width={band.w} height={band.h} fill="rgba(6,208,110,0.28)" stroke="var(--pid-select)" strokeWidth={1.2} />}
-                    {/* Canal visé : mot simple, puis nom technique (08Aa_CH02) en petit. */}
-                    <text x={b.cx} y={b.y0 - 14} textAnchor="middle" style={{ font: '600 12px var(--font-sans)', fill: 'var(--abi-green-glow)', paintOrder: 'stroke', stroke: 'var(--pid-bg)', strokeWidth: 4, strokeLinejoin: 'round' }}>
+                    {/* Canal visé (seulement s'il y a un choix) : mot simple, puis nom technique (08Aa_CH02) en petit. */}
+                    {n > 1 && <text x={b.cx} y={b.y0 - 14} textAnchor="middle" style={{ font: '600 12px var(--font-sans)', fill: 'var(--abi-green-glow)', paintOrder: 'stroke', stroke: 'var(--pid-bg)', strokeWidth: 4, strokeLinejoin: 'round' }}>
                       {tx(L.targetCh, wire.targetCh)}
                       <tspan dx={5} style={{ font: '600 9px var(--font-tag)', fill: 'var(--pid-caption)' }}>
                         {(t.repere || '?') + '_CH' + pad2(wire.targetCh)}
                       </tspan>
-                    </text>
+                    </text>}
                   </g>
                 );
               })()}

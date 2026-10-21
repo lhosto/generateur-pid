@@ -47,7 +47,8 @@ export function createEq(cat: Catalogue, p: Pivot, hg0: string, x: number, y: nu
     y: snap(y),
     flow: o.flow ?? 'E',
     hg,
-    options: { ...defaultOptions(cat), ...(o.options ?? {}) },
+    // Convoyeur sur variateur : marche arrière autorisée d'office (le variateur sait inverser).
+    options: { ...defaultOptions(cat), ...(hg0 === 'BELT' && hg.some((h) => h.type === 'DRIV') ? { reverseAllowed: true } : {}), ...(o.options ?? {}) },
     setpoints: defaultSetpoints(cat, hg[0].type),
     // Nativement, le canal 1 a sa sortie 1.1 déclarée, en attente de raccordement (sauf armoire « no action »).
     channels: Array.from({ length: Math.min(MAX.channels, o.channels ?? 1) }, (_, i) => ({

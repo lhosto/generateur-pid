@@ -44,3 +44,8 @@
 | Convoyeur dans le menu « + » | Deux choix : départ direct (KM) et avec variateur (DRIV) ; celui des réglages de base en tête, « par défaut » | Décidé | 21/10/2026 |
 | Coudes des sorties d'un même départ | Coude commun à toutes les sorties d'un même canal : 20 px avant l'arrivée la plus proche | Décidé | 21/10/2026 |
 | Réorganiser : espacement | Écarts essayés du plus aéré (50 px dans une colonne, 90 px entre colonnes) au plus serré (30 / 60) ; le premier qui tient dans 1920 × 1080 est gardé ; jamais moins de 30 px entre deux objets | Décidé | 21/10/2026 |
+| Marche arrière d'office | Convoyeur (BELT) créé sur variateur (DRIV) : option « Autoriser la marche arrière » cochée d'office ; en départ direct (KM) : non | Décidé | 21/10/2026 |
+| Arrivée par le milieu | Seulement si l'équipement cible a une sortie marche arrière déclarée ; marche arrière simplement autorisée → arrivée par l'arrière (affine la règle du 21/10) | À valider | 21/10/2026 |
+| Ordre des départs | Flux horizontal : 1.1 (−) en bas, 1.2 (+), 1.3 (++)… au-dessus ; flux vertical : 1.2 à droite de 1.1. Croisements imposés par cet ordre acceptés (renuméroter pour les éviter), jamais deux traits superposés | Décidé | 21/10/2026 |
+| Boucle par la marche arrière | Un circuit qui passe par une sortie AR (088 AR → 091 → 092 → 086) est une boucle : ↺ sur le lien de retour, et gros ↺ là où il rejoint son arrivée. Le lien de retour reste plein (le pointillé est réservé à l'AR) | Proposé | 21/10/2026 |
+| Choix du canal en tirant un trait | Libellé « Canal n » affiché seulement si la cible a plusieurs canaux | Décidé | 21/10/2026 |

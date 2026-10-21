@@ -389,7 +389,8 @@ describe('départs de sorties', () => {
     const { links, stubs } = routeAll(r.p);
     const s2 = links.find((l) => l.link.from.eq === a.id)!.points[0];
     const s1 = stubs.find((s) => s.ref.eq === a.id)!.points[0];
-    expect(s1[1]).toBeLessThan(s2[1]);
+    // Flux horizontal : la sortie 2 (positive) au-dessus de la sortie 1.
+    expect(s2[1]).toBeLessThan(s1[1]);
     for (const y of [s1[1], s2[1]]) expect(y > box.y0 && y < box.y1).toBe(true);
   });
 });
@@ -435,7 +436,7 @@ describe('croisements de traits', () => {
     for (const x2 of xs(t2.id)) for (const x1 of xs(t1.id)) expect(Math.abs(x2 - x1)).toBeGreaterThanOrEqual(8);
   });
   it('site de test : seuls restent les croisements imposés (ordre des sorties, canaux différents)', () => {
-    expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(9);
+    expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(12);
   });
 });
 
@@ -448,6 +449,9 @@ describe('convoyeur : départ direct ou variateur', () => {
     expect(types(km.p, km.id!)).toContain('KM');
     expect(types(dr.p, dr.id!)).toContain('DRIV');
     expect(types(dr.p, dr.id!)).not.toContain('KM');
+    // Marche arrière autorisée d'office sur variateur, pas en départ direct.
+    expect(findEq(dr.p, dr.id!)!.options.reverseAllowed).toBe(true);
+    expect(findEq(km.p, km.id!)!.options.reverseAllowed).toBeFalsy();
   });
 });
 
@@ -469,15 +473,56 @@ describe('standards de formes', () => {
 });
 
 describe('coudes des sorties d\'un même départ', () => {
-  it('1.1 vers le haut et 1.2 vers le bas coudent sur la même colonne', () => {
+  it('1.1 vers le bas et 1.2 vers le haut coudent sur la même colonne', () => {
     let p = emptyPivot(cat);
     const a = addEq(cat, p, 'BELT', 100, 200);
     const up = addEq(cat, a.p, 'BELT', 260, 150);
     const down = addEq(cat, up.p, 'BELT', 300, 250);
-    p = connect(down.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: up.id, ch: 1 });
-    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: down.id, ch: 1 });
+    // Flux horizontal : 1.2 (positive) part au-dessus de 1.1.
+    p = connect(down.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: down.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: up.id, ch: 1 });
     const r = routeAll(p).links;
     const bendX = (to: string) => r.find((l) => l.link.to.eq === to)!.points[1][0];
     expect(bendX(up.id)).toBe(bendX(down.id));
+  });
+});
+
+describe('pas de petit décrochement', () => {
+  it('arrivée par le dessous d\'un équipement réversible : trait en L net', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 300, { command: 'DRIV' });
+    const up = addEq(cat, a.p, 'BELT', 300, 200, { command: 'DRIV' });
+    const down = addEq(cat, up.p, 'BELT', 260, 400, { command: 'DRIV' });
+    p = connect(down.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: up.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: down.id, ch: 1 });
+    p = connect(p, { eq: up.id, ch: 1, dir: 'arriere', num: 1 }, { eq: down.id, ch: 1 });
+    // 1.1 vers l'équipement du haut, arrivée par le dessous : un seul coude (L).
+    expect(routeAll(p).links.find((l) => l.link.from.num === 1 && l.link.from.dir === 'avant')!.points).toHaveLength(3);
+    for (const l of routeAll(p).links) {
+      const q = l.points;
+      for (let i = 2; i < q.length - 1; i++) expect(Math.abs(q[i][0] - q[i - 1][0]) + Math.abs(q[i][1] - q[i - 1][1])).toBeGreaterThanOrEqual(6);
+    }
+  });
+});
+
+describe('boucle par la marche arrière', () => {
+  it('088 AR → 091 → 092 → 086 : le retour vers 086 porte le repère de boucle', () => {
+    let p = emptyPivot(cat);
+    const mk = (x: number, y: number, flow: 'E' | 'W' = 'E') => {
+      const r = addEq(cat, p, 'BELT', x, y, { command: 'DRIV', flow });
+      p = r.p;
+      return r.id;
+    };
+    const e85 = mk(0, 200), e86 = mk(100, 200), e87 = mk(200, 200), e88 = mk(300, 150);
+    const e91 = mk(200, 100, 'W'), e92 = mk(100, 100, 'W');
+    p = connect(p, { eq: e85, ch: 1, dir: 'avant', num: 1 }, { eq: e86, ch: 1 });
+    p = connect(p, { eq: e86, ch: 1, dir: 'avant', num: 1 }, { eq: e87, ch: 1 });
+    p = connect(p, { eq: e87, ch: 1, dir: 'avant', num: 1 }, { eq: e88, ch: 1 });
+    p = connect(p, { eq: e88, ch: 1, dir: 'arriere', num: 1 }, { eq: e91, ch: 1 });
+    p = connect(p, { eq: e91, ch: 1, dir: 'avant', num: 1 }, { eq: e92, ch: 1 });
+    p = connect(p, { eq: e92, ch: 1, dir: 'avant', num: 1 }, { eq: e86, ch: 1 });
+    const loops = loopLinks(p);
+    const back = p.links.find((l) => l.from.eq === e92)!;
+    expect([...loops]).toEqual([back.id]);
   });
 });

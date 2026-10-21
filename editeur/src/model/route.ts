@@ -70,21 +70,23 @@ function tagBox(t: TagPos, text: string): Box {
 }
 
 /** Positions candidates le long du trait : après le premier coude, puis depuis le départ, tous les 10 px. */
-function tagCandidates(points: Pt[]): TagPos[] {
+function tagCandidates(points: Pt[], w = 16): TagPos[] {
   const out: TagPos[] = [];
   const along = (a: Pt, b: Pt, from: number) => {
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
     const vx = (b[0] - a[0]) / (len || 1);
     const vy = (b[1] - a[1]) / (len || 1);
     const vertical = Math.abs(vx) < 0.5;
-    for (let d = from; d <= len - 10; d += 10) {
+    for (let d = from; d <= Math.max(from, len - 10); d += 10) {
       const x = a[0] + vx * d;
       const y = a[1] + vy * d;
       out.push(vertical ? { x: x + 4, y, anchor: 'start' } : { x, y: y - 5, anchor: 'middle' });
     }
   };
-  // D'abord collée au départ (on voit de quelle sortie il s'agit), puis après le premier coude.
-  along(points[0], points[1], 9);
+  // D'abord collée au départ (on voit de quelle sortie il s'agit) : le texte commence 3 px après le
+  // bord de l'équipement ; puis après le premier coude.
+  const first = Math.abs(points[1][0] - points[0][0]) < 0.5 ? 6 : w / 2 + 3;
+  along(points[0], points[1], first);
   if (points.length > 2) along(points[1], points[2], 9);
   for (let i = 2; i < points.length - 1; i++) along(points[i], points[i + 1], 10);
   return out;
@@ -104,11 +106,11 @@ export function placeTags(p: Pivot, links: RoutedLink[], text: (l: RoutedLink) =
   });
   const placed: Box[] = [];
   const out = new Map<string, TagPos>();
-  const free = (bx: Box) => !placed.some((o) => overlapsBox(o, bx, 1)) && !obstacles.some((o) => overlapsBox(o, bx, 2));
+  const free = (bx: Box) => !placed.some((o) => overlapsBox(o, bx, 1)) && !obstacles.some((o) => overlapsBox(o, bx, 0));
   for (const l of links) {
     const t = text(l);
     if (!t) continue;
-    const cands = tagCandidates(l.points);
+    const cands = tagCandidates(l.points, tagWidth(t));
     const pick = cands.find((c) => free(tagBox(c, t))) ?? cands[0] ?? tagAnchor(l.points);
     out.set(l.id, pick);
     placed.push(tagBox(pick, t));
@@ -251,11 +253,15 @@ function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], other
       const obs = i === 1 || i === full.length - 1 ? others : all;
       if (obs.some((o) => hits(full[i - 1], full[i], o, 4))) return null;
     }
+    // Pas de petit décrochement (segment intérieur de moins de 6 px).
+    for (let i = 2; i < full.length - 1; i++) if (Math.abs(full[i][0] - full[i - 1][0]) + Math.abs(full[i][1] - full[i - 1][1]) < 6) return null;
     return clear && !clear(full) ? null : full;
   };
   const tries: Pt[][] = [];
-  // Coude commun imposé (sorties d'un même départ) : essayé en premier, sur l'axe du départ.
-  if (hint !== undefined) {
+  // Coude commun imposé (sorties d'un même départ) : essayé en premier, sur l'axe du départ, quand
+  // départ et arrivée se font face (tracé en Z) ; pour une arrivée par le dessus / dessous (tracé en
+  // L), il créerait un petit décrochement.
+  if (hint !== undefined && isHorizontal(sSide) === isHorizontal(tSide)) {
     if (isHorizontal(sSide)) tries.push([s, p1, [hint, p1[1]], [hint, p2[1]], p2, t]);
     else tries.push([s, p1, [p1[0], hint], [p2[0], hint], p2, t]);
   }
@@ -308,7 +314,7 @@ const GAP = 8;
  * côte à côte à moins de GAP (on ne les distinguerait plus). Côte à côte est permis si les deux traits
  * vont au même point d'arrivée (ils se rejoignent avant la flèche) ; le croisement, jamais.
  */
-function conflicts(a0: Pt, a1: Pt, b0: Pt, b1: Pt, sameEnd: boolean): boolean {
+function conflicts(a0: Pt, a1: Pt, b0: Pt, b1: Pt, sameEnd: boolean, allowCross = false): boolean {
   const aH = near(a0[1], a1[1]);
   const bH = near(b0[1], b1[1]);
   const [ax0, ax1] = [Math.min(a0[0], a1[0]), Math.max(a0[0], a1[0])];
@@ -316,6 +322,7 @@ function conflicts(a0: Pt, a1: Pt, b0: Pt, b1: Pt, sameEnd: boolean): boolean {
   const [bx0, bx1] = [Math.min(b0[0], b1[0]), Math.max(b0[0], b1[0])];
   const [by0, by1] = [Math.min(b0[1], b1[1]), Math.max(b0[1], b1[1])];
   if (aH !== bH) {
+    if (allowCross) return false;
     const [h, v] = aH ? [[ax0, ax1, a0[1]], [b0[0], by0, by1]] : [[bx0, bx1, b0[1]], [a0[0], ay0, ay1]];
     return v[0] > h[0] + 0.5 && v[0] < h[1] - 0.5 && h[2] > v[1] + 0.5 && h[2] < v[2] - 0.5;
   }
@@ -324,12 +331,12 @@ function conflicts(a0: Pt, a1: Pt, b0: Pt, b1: Pt, sameEnd: boolean): boolean {
   return Math.abs(a0[0] - b0[0]) < GAP && Math.min(ay1, by1) - Math.max(ay0, by0) > 1;
 }
 
-/** Le tracé ne croise (ni ne longe) aucun trait déjà posé. */
-function crossesNone(pts: Pt[], end: Pt, placed: Placed[]): boolean {
+/** Le tracé ne croise (ni ne longe) aucun trait déjà posé ; avec allowCross, seul le longer est interdit. */
+function crossesNone(pts: Pt[], end: Pt, placed: Placed[], allowCross = false): boolean {
   for (const q of placed) {
     const same = near(q.end[0], end[0]) && near(q.end[1], end[1]);
     for (let i = 1; i < pts.length; i++)
-      for (let j = 1; j < q.pts.length; j++) if (conflicts(pts[i - 1], pts[i], q.pts[j - 1], q.pts[j], same)) return false;
+      for (let j = 1; j < q.pts.length; j++) if (conflicts(pts[i - 1], pts[i], q.pts[j - 1], q.pts[j], same, allowCross)) return false;
   }
   return true;
 }
@@ -341,6 +348,8 @@ function routeLink(a: End, b: End, obstacles: Box[], sSide: Flow, tSide: Flow, p
   // un croisement ; en dernier recours, de passer sur un équipement.
   return (
     connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0, (pts) => crossesNone(pts, t, placed), hint) ??
+    // Croisement imposé (ordre des sorties…) : accepté, mais jamais deux traits l'un sur l'autre.
+    connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0, (pts) => crossesNone(pts, t, placed, true), hint) ??
     connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0, undefined, hint) ??
     connectSides(s0, sSide, t, tSide, [], [], a.port ?? 0) ??
     simplify([s0, t])
@@ -351,12 +360,13 @@ function routeLink(a: End, b: End, obstacles: Box[], sSide: Flow, tSide: Flow, p
 export const departureSide = (src: Eq, dir: Dir): Flow => (dir === 'avant' ? src.flow : opposite(src.flow));
 
 /**
- * Côté d'arrivée sur l'équipement cible. Sans marche arrière programmée, la matière entre par
+ * Côté d'arrivée sur l'équipement cible. Sans marche arrière programmée (aucune sortie arrière), la matière entre par
  * l'arrière (côté amont du flux, sur l'axe du canal). Avec marche arrière, elle peut partir dans les
  * deux sens : elle arrive au milieu, par le dessus ou le dessous (côté qui fait face à la source).
  */
 export function arrivalSide(dst: Eq, src: Box, dstBox: Box): Flow {
-  const reversible = !!dst.options.reverseAllowed && !dst.hg.some((h) => h.type === 'KM');
+  // Marche arrière programmée = au moins une sortie arrière déclarée (l'autoriser seulement ne change pas le tracé).
+  const reversible = dst.channels.some((c) => c.outputs.some((o) => o.dir === 'arriere'));
   if (!reversible) return opposite(dst.flow);
   return isHorizontal(dst.flow) ? (src.cy < dstBox.cy ? 'N' : 'S') : src.cx < dstBox.cx ? 'W' : 'E';
 }
@@ -368,22 +378,27 @@ export function arrivalSide(dst: Eq, src: Box, dstBox: Box): Flow {
  * Les liens de marche arrière ne comptent pas : ce sont des données à part (pointillé « AR »).
  */
 export function loopLinks(p: Pivot): Set<string> {
+  // Tous les liens comptent pour trouver les circuits (une boucle peut passer par une sortie arrière :
+  // 088 AR → 091 → 092 → 086) ; seul un lien de marche avant porte le repère ↺ (l'AR a déjà le sien).
   const out = new Map<string, Link[]>();
   const fed = new Set<string>();
   for (const l of p.links) {
-    if (l.from.dir !== 'avant' || l.from.eq === l.to.eq) continue;
+    if (l.from.eq === l.to.eq) continue;
     if (!out.has(l.from.eq)) out.set(l.from.eq, []);
     out.get(l.from.eq)!.push(l);
-    fed.add(l.to.eq);
+    fed.add(l.to.eq); // départs du parcours : les entrées de ligne, où rien n'arrive
   }
+  // Marche avant d'abord : le circuit se ferme sur le lien qui revient en amont, pas sur l'AR.
+  for (const ls of out.values()) ls.sort((a, b) => (a.from.dir === b.from.dir ? 0 : a.from.dir === 'avant' ? -1 : 1));
   const loops = new Set<string>();
   const state = new Map<string, 1 | 2>(); // 1 = en cours, 2 = terminé
   const visit = (id: string) => {
     state.set(id, 1);
     for (const l of out.get(id) ?? []) {
       const s = state.get(l.to.eq);
-      if (s === 1) loops.add(l.id);
-      else if (!s) visit(l.to.eq);
+      if (s === 1) {
+        if (l.from.dir === 'avant') loops.add(l.id);
+      } else if (!s) visit(l.to.eq);
     }
     state.set(id, 2);
   };
@@ -398,17 +413,22 @@ export function portPitch(eq: Eq, box: Box, count: number): number {
   return Math.min(14, band / Math.max(1, count - 1));
 }
 
-/** Décalage de la sortie de rang `rank` (0 = S1) dans un groupe de `count`, centré sur l'axe du canal. */
-const slot = (eq: Eq, box: Box, rank: number, count: number) => (rank - (count - 1) / 2) * portPitch(eq, box, count);
+/**
+ * Décalage de la sortie de rang `rank` (0 = S1) dans un groupe de `count`, centré sur l'axe du canal.
+ * Départ sur un côté vertical (flux vers la droite / la gauche) : S2, S3… au-dessus de S1 (les positives
+ * au-dessus de la négative) ; sur un côté horizontal (flux vertical) : à droite.
+ */
+const slot = (eq: Eq, box: Box, dir: Dir, rank: number, count: number) =>
+  (isHorizontal(departureSide(eq, dir)) ? -1 : 1) * (rank - (count - 1) / 2) * portPitch(eq, box, count);
 
 /**
  * Décalage du départ de la sortie num par rapport à l'axe du canal. Les sorties déclarées (reliées ou
- * en attente) se partagent la bande du canal, centrées sur l'axe : S1 à gauche / en haut, puis S2, S3…
- * à droite / en dessous. Une sortie seule est sur l'axe.
+ * en attente) se partagent la bande du canal, centrées sur l'axe : S1 en bas (flux horizontal) ou à
+ * gauche (flux vertical), puis S2, S3… au-dessus / à droite. Une sortie seule est sur l'axe.
  */
 export function portOffset(eq: Eq, box: Box, ch: number, dir: Dir, num: number): number {
   const nums = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir).map((o) => o.num).sort((a, b) => a - b);
-  return slot(eq, box, Math.max(0, nums.indexOf(num)), nums.length);
+  return slot(eq, box, dir, Math.max(0, nums.indexOf(num)), nums.length);
 }
 
 export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
@@ -426,8 +446,8 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k)!.push(l);
   }
-  // Ordre fixe, sorties en attente comprises, groupe centré sur l'axe du canal : S1, puis S2, S3… toujours à droite
-  // (côté horizontal) ou en dessous (côté vertical) : 1.2 est toujours à droite de 1.1.
+  // Ordre fixe, sorties en attente comprises, groupe centré sur l'axe du canal : voir slot (1.2 au-dessus
+  // de 1.1 en flux horizontal, à droite en flux vertical).
   for (const g of groups.values()) {
     const e = eqs.get(g[0].from.eq);
     if (!e) continue;
@@ -551,7 +571,7 @@ export function handlePositions(eq: Eq, box: Box, dir: Dir): { ch: number; at: P
     // À la place de la sortie suivante, un peu au-delà du bout des traits.
     // Canal déjà raccordé : petit « + » au bout de la place de la sortie suivante, comme celui d'une
     // sortie en attente (même endroit, même taille).
-    const lat = used ? slot(eq, box, count, count + 1) : 0;
+    const lat = used ? slot(eq, box, dir, count, count + 1) : 0;
     const out = used ? 16 : 26;
     return { ch: i + 1, at: [ax + vx * out + (vx === 0 ? lat : 0), ay + vy * out + (vy === 0 ? lat : 0)] as Pt, small: used };
   });
