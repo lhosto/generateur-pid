@@ -889,6 +889,10 @@ export function Canvas(props: Props) {
                   >
                     <rect x={x - w / 2 - 4} y={y - h / 2 - 4} width={w + 8} height={h + 8} fill="transparent" />
                     <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={1.5} fill={on ? 'var(--pid-select)' : hot ? '#fff' : 'var(--pid-stroke-light)'} />
+                    {/* Canal du convoyeur, sortie positive : 1+, 2+, 3+… à côté du joint. */}
+                    <text x={vertical ? x : x + w / 2 + 3} y={vertical ? y - h / 2 - 6 : y} textAnchor={vertical ? 'middle' : 'start'} dominantBaseline="central" style={{ ...TAG_STYLE, fill: on ? 'var(--pid-select)' : TAG_STYLE.fill }}>
+                      {tagText(`${l.link.from.ch}+`)}
+                    </text>
                   </g>
                 );
             })}

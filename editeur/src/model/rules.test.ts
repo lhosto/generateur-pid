@@ -360,8 +360,9 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     expect(shortTag(ch2, 2, 1, 'avant')).toBe('2');
     const mix = { ...sep, channels: [two.channels[0], ch2.channels[1]] };
     expect(shortTag(mix, 1, 2, 'avant')).toBe('1+');
-    // Plusieurs canaux : le numéro du canal seulement.
-    expect(tagFor(2, 1, 2, 2, 'avant', false)).toBe('1');
+    // Plusieurs canaux : le canal, ou canal.sortie si ce canal a plusieurs sorties.
+    expect(tagFor(2, 1, 2, 2, 'avant', false)).toBe('1.2');
+    expect(tagFor(2, 2, 1, 1, 'avant', false)).toBe('2');
     expect(tagFor(2, 1, 3, 3, 'avant')).toBe('1++');
     expect(tagFor(1, 1, 3, 3, 'arriere')).toBe('++');
     // Dès 4 sorties, numérotation 1.1, 1.2… (même avec un seul canal).

@@ -58,9 +58,9 @@ export function tagFor(nChannels: number, ch: number, num: number, count: number
   void dir;
   const ar = '';
   const chPart = nChannels > 1 ? `${ch}` : '';
-  // Hors séparation : sorties principales, sans numéro ni − / + ; seul le canal est écrit, s'il y en a plusieurs.
-  void count;
-  if (!separation) return [chPart, ar].filter(Boolean).join(' ');
+  // Hors séparation : sorties principales, sans − / +. Un seul canal : rien ; plusieurs canaux : le
+  // canal, ou « canal.sortie » (1.1, 2.1…) dès qu'un canal a plusieurs sorties.
+  if (!separation) return [nChannels > 1 && count > 1 ? `${ch}.${num}` : chPart, ar].filter(Boolean).join(' ');
   // Dès 4 sorties : 1.1(−) pour la négative, 1.2, 1.3… pour les autres.
   const core = count >= 4 ? `${ch}.${num}${num === 1 ? '(−)' : ''}` : count <= 1 ? chPart : chPart + (num === 1 ? '−' : '+'.repeat(num - 1));
   return [core, ar].filter(Boolean).join(' ');

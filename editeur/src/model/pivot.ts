@@ -48,6 +48,8 @@ export interface Eq {
   setpoints: Setpoint[];
   /** 1 à 3 canaux ; le canal n est channels[n-1]. */
   channels: Channel[];
+  /** Overband / poulie accolé à ce convoyeur (id) : collé à son flanc, lien dessiné en joint. */
+  dockedTo?: string;
 }
 
 export interface OutputRef {

@@ -1,4 +1,5 @@
 // Historique du pivot : annuler / rétablir (100 pas) et sauvegarde automatique dans le navigateur.
+import { settleDocked } from './dock';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PIVOT_FORMAT, type Pivot } from './pivot';
 
@@ -39,7 +40,9 @@ export function usePivotHistory(init: () => Pivot) {
   }, [h.present]);
 
   /** Modification enregistrée dans l'historique. `from` = état d'avant un geste continu (glisser). */
-  const commit = useCallback((next: Pivot, from?: Pivot) => {
+  const commit = useCallback((raw: Pivot, from?: Pivot) => {
+    // Overbands / poulies accolés : toujours recollés au flanc de leur convoyeur (taille changée…).
+    const next = settleDocked(raw);
     setH((s) => {
       const prev = from ?? s.present;
       if (next === prev) return s;
@@ -48,7 +51,7 @@ export function usePivotHistory(init: () => Pivot) {
   }, []);
 
   /** Modification transitoire (pendant un glisser), sans entrée d'historique. */
-  const preview = useCallback((next: Pivot) => setH((s) => ({ ...s, present: next })), []);
+  const preview = useCallback((next: Pivot) => setH((s) => ({ ...s, present: settleDocked(next) })), []);
 
   const undo = useCallback(() => {
     setH((s) => (s.past.length ? { past: s.past.slice(0, -1), present: s.past[s.past.length - 1], future: [s.present, ...s.future] } : s));

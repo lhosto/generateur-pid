@@ -24,7 +24,7 @@ const L = {
   outputs: { fr: 'Sorties', en: 'Outputs' },
   forwardLine: { fr: 'marche avant', en: 'forward' },
   reverseLine: { fr: 'marche arrière (AR)', en: 'reverse (AR)' },
-  tagMeaning: { fr: 'séparation : canal 1, sortie positive (− négative, ++ 2e positive) ; autres machines : numéro du canal seulement, s’il y en a plusieurs', en: 'separation: channel 1, positive output (− negative, ++ 2nd positive); other machines: channel number only, when several' },
+  tagMeaning: { fr: 'séparation : canal 1, sortie positive (− négative, ++ 2e positive) ; autres machines : numéro du canal s’il y en a plusieurs (1.1, 2.1 si plusieurs sorties)', en: 'separation: channel 1, positive output (− negative, ++ 2nd positive); other machines: channel number when several (1.1, 2.1 with several outputs)' },
   pendingMeaning: { fr: 'sortie en attente : à raccorder ou supprimer', en: 'pending output: connect or remove it' },
   loopMeaning: { fr: 'boucle, retour en amont', en: 'loop, back upstream' },
   colorsTbc: { fr: 'couleurs à valider', en: 'colors to be confirmed' },
