@@ -24,7 +24,7 @@ const L = {
   outputs: { fr: 'Sorties', en: 'Outputs' },
   forwardLine: { fr: 'marche avant', en: 'forward' },
   reverseLine: { fr: 'marche arrière (AR)', en: 'reverse (AR)' },
-  tagMeaning: { fr: 'séparation : canal 1, sortie positive (− négative, ++ 2e positive) ; autres machines : 1, 2… (sorties principales)', en: 'separation: channel 1, positive output (− negative, ++ 2nd positive); other machines: 1, 2… (main outputs)' },
+  tagMeaning: { fr: 'séparation : canal 1, sortie positive (− négative, ++ 2e positive) ; autres machines : numéro du canal seulement, s’il y en a plusieurs', en: 'separation: channel 1, positive output (− negative, ++ 2nd positive); other machines: channel number only, when several' },
   pendingMeaning: { fr: 'sortie en attente : à raccorder ou supprimer', en: 'pending output: connect or remove it' },
   loopMeaning: { fr: 'boucle, retour en amont', en: 'loop, back upstream' },
   colorsTbc: { fr: 'couleurs à valider', en: 'colors to be confirmed' },
@@ -139,8 +139,8 @@ export function AlignBar({ count, onAlign, onDistribute, onStraighten }: { count
 /** Légende des sorties, compacte, dans le pied de la bibliothèque (ne masque pas le canevas). */
 export function Legend() {
   const item = (key: string, stroke: string, label: string, dash?: string) => (
-    <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
-      <svg width={22} height={6} aria-hidden="true"><line x1={0} y1={3} x2={22} y2={3} stroke={stroke} strokeWidth={2} strokeDasharray={dash} /></svg>
+    <span key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minHeight: 16, lineHeight: '15px' }}>
+      <svg width={22} height={6} aria-hidden="true" style={{ flex: 'none', marginTop: 5 }}><line x1={0} y1={3} x2={22} y2={3} stroke={stroke} strokeWidth={2} strokeDasharray={dash} /></svg>
       {label}
     </span>
   );
@@ -152,13 +152,13 @@ export function Legend() {
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {item('av', outputColor(1), tx(L.forwardLine))}
         {item('ar', outputColor(1), tx(L.reverseLine), '4 3')}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
-          <span style={{ width: 22, font: '600 9px var(--font-tag)', color: 'var(--pid-caption)', textAlign: 'center' }}>1+</span>
+        <span style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minHeight: 16, lineHeight: '15px' }}>
+          <span style={{ width: 22, flex: 'none', font: '600 9px var(--font-tag)', color: 'var(--pid-caption)', textAlign: 'center' }}>1+</span>
           {tx(L.tagMeaning)}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
+        <span style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minHeight: 16, lineHeight: '15px' }}>
           {/* Retour de boucle : pointillé rond, ↺ au départ (comme « AR » pour la marche arrière). */}
-          <svg width={22} height={10} style={{ flex: 'none' }} aria-hidden="true"><line x1={2} y1={5} x2={20} y2={5} stroke="var(--pid-stroke-light)" strokeWidth={2.4} strokeLinecap="round" strokeDasharray="0.1 5" /></svg>
+          <svg width={22} height={10} style={{ flex: 'none', marginTop: 3 }} aria-hidden="true"><line x1={2} y1={5} x2={20} y2={5} stroke="var(--pid-stroke-light)" strokeWidth={2.4} strokeLinecap="round" strokeDasharray="0.1 5" /></svg>
           ↺ {tx(L.loopMeaning)}
         </span>
         <span style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minHeight: 16, lineHeight: '15px' }}>

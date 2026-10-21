@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, EMPTY_SEL, fitView, ZoomBar, type Selection, type View } from './canvas/Canvas';
 import { siteTest, stressSite } from './fictif/siteTest.fictif';
+import { siteLigneA } from './fictif/siteLigneA.fictif';
 import { fakeReport, openPivot, savePivot } from './io/files';
 import { align, distribute, type AlignMode, type Axis } from './model/align';
 import { readEmbeddedCatalogue } from './model/catalogue';
@@ -43,6 +44,8 @@ const L = {
   testLoaded: { fr: 'Site de test chargé', en: 'Test site loaded' },
   stress: { fr: 'Test de charge : ≈ 200 équipements', en: 'Load test: ≈ 200 Equipment items' },
   stressLoaded: { fr: 'Test de charge chargé', en: 'Load test loaded' },
+  ligneA: { fr: 'Prototype : ligne A (d’après un PID réel)', en: 'Prototype: line A (from a real P&ID)' },
+  ligneALoaded: { fr: 'Prototype ligne A chargé', en: 'Line A prototype loaded' },
   newSite: { fr: 'Nouveau site vide', en: 'New empty site' },
   newSiteDone: { fr: 'Nouveau site', en: 'New site' },
   open: { fr: 'Ouvrir', en: 'Open' },
@@ -300,6 +303,7 @@ export function App() {
             <div style={{ position: 'absolute', right: 0, top: 38, width: 240, background: 'var(--surface-page)', border: '1px solid var(--border-input)', zIndex: 30 }}>
               {[
                 { id: 'test', label: tx(L.reloadTest), act: () => replace(siteTest(cat), tx(L.testLoaded)) },
+                { id: 'ligneA', label: tx(L.ligneA), act: () => replace(siteLigneA(cat), tx(L.ligneALoaded)) },
                 { id: 'charge', label: <>{tx(L.stress)}<Abbr>EQ</Abbr></>, act: () => replace(stressSite(cat), tx(L.stressLoaded)) },
                 { id: 'vide', label: tx(L.newSite), act: () => replace(emptyPivot(cat, tx(L.newSiteDone)), tx(L.newSiteDone)) },
               ].map((m) => (

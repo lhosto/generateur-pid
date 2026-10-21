@@ -55,8 +55,9 @@ export function tagFor(nChannels: number, ch: number, num: number, count: number
   void dir;
   const ar = '';
   const chPart = nChannels > 1 ? `${ch}` : '';
-  // Hors séparation : sorties principales, numérotées simplement (2, 3… ; 1.2 en multicanal), sans − / +.
-  if (!separation) return [count <= 1 ? chPart : nChannels > 1 ? `${ch}.${num}` : `${num}`, ar].filter(Boolean).join(' ');
+  // Hors séparation : sorties principales, sans numéro ni − / + ; seul le canal est écrit, s'il y en a plusieurs.
+  void count;
+  if (!separation) return [chPart, ar].filter(Boolean).join(' ');
   // Dès 4 sorties : 1.1(−) pour la négative, 1.2, 1.3… pour les autres.
   const core = count >= 4 ? `${ch}.${num}${num === 1 ? '(−)' : ''}` : count <= 1 ? chPart : chPart + (num === 1 ? '−' : '+'.repeat(num - 1));
   return [core, ar].filter(Boolean).join(' ');
@@ -351,7 +352,20 @@ function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], other
 interface Placed {
   pts: Pt[];
   end: Pt;
+  /** Boîte englobante du tracé (tri rapide : on ne compare qu'aux traits proches). */
+  box?: [number, number, number, number];
 }
+
+const ptsBox = (pts: Pt[]): [number, number, number, number] => {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of pts) {
+    if (x < x0) x0 = x;
+    if (y < y0) y0 = y;
+    if (x > x1) x1 = x;
+    if (y > y1) y1 = y;
+  }
+  return [x0, y0, x1, y1];
+};
 
 const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
 /** Ligne droite au départ des sorties d'un canal qui en a plusieurs : place des étiquettes, sans coude ni croisement. */
@@ -384,7 +398,10 @@ function conflicts(a0: Pt, a1: Pt, b0: Pt, b1: Pt, sameEnd: boolean, allowCross 
 
 /** Le tracé ne croise (ni ne longe) aucun trait déjà posé ; avec allowCross, seul le longer est interdit. */
 function crossesNone(pts: Pt[], end: Pt, placed: Placed[], allowCross = false): boolean {
+  const [x0, y0, x1, y1] = ptsBox(pts);
   for (const q of placed) {
+    const qb = q.box ?? (q.box = ptsBox(q.pts));
+    if (qb[0] > x1 + GAP || qb[2] < x0 - GAP || qb[1] > y1 + GAP || qb[3] < y0 - GAP) continue;
     const same = near(q.end[0], end[0]) && near(q.end[1], end[1]);
     // Sorties d'un même départ (même bord, départs proches) : jamais de croisement collé aux étiquettes.
     const s0 = pts[0];
@@ -585,7 +602,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
   // 1re passe : chaque trait évite ceux déjà tracés. 2e et 3e passes : un trait qui croise encore est
   // retracé en tenant compte de tous les autres, gardé seulement s'il ne croise plus rien.
   const paths: Pt[][] = [];
-  const asPlaced = (pts: Pt[]): Placed => ({ pts, end: pts[pts.length - 1] });
+  const asPlaced = (pts: Pt[]): Placed => ({ pts, end: pts[pts.length - 1], box: ptsBox(pts) });
   for (const l of valid) paths.push(route(l, paths.map(asPlaced)));
   for (let pass = 0; pass < 2; pass++) {
     for (let i = 0; i < valid.length; i++) {

@@ -349,9 +349,9 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     // Marche arrière : même étiquette qu'à l'avant (« AR » est écrit sur le trait).
     expect(shortTag(e, 1, 1, 'arriere')).toBe('');
     const two = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }] }] };
-    // Convoyeur : sorties principales, simplement numérotées.
-    expect(shortTag(two, 1, 1, 'avant')).toBe('1');
-    expect(shortTag(two, 1, 2, 'avant')).toBe('2');
+    // Convoyeur, un seul canal : sorties principales, sans numéro.
+    expect(shortTag(two, 1, 1, 'avant')).toBe('');
+    expect(shortTag(two, 1, 2, 'avant')).toBe('');
     // Machine de séparation (trieur optique) : − / +.
     const sep = { ...two, hg: [{ ...e.hg[0], type: 'OPSO' }] };
     expect(shortTag(sep, 1, 1, 'avant')).toBe('−');
@@ -360,7 +360,8 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     expect(shortTag(ch2, 2, 1, 'avant')).toBe('2');
     const mix = { ...sep, channels: [two.channels[0], ch2.channels[1]] };
     expect(shortTag(mix, 1, 2, 'avant')).toBe('1+');
-    expect(tagFor(2, 1, 2, 2, 'avant', false)).toBe('1.2');
+    // Plusieurs canaux : le numéro du canal seulement.
+    expect(tagFor(2, 1, 2, 2, 'avant', false)).toBe('1');
     expect(tagFor(2, 1, 3, 3, 'avant')).toBe('1++');
     expect(tagFor(1, 1, 3, 3, 'arriere')).toBe('++');
     // Dès 4 sorties, numérotation 1.1, 1.2… (même avec un seul canal).
