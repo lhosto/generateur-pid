@@ -894,8 +894,9 @@ export function Canvas(props: Props) {
             onPointerDown={(e) => e.stopPropagation()}
             style={{ position: 'absolute', left: hx - 10, top: hy + 12, display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', background: 'var(--surface-page)', border: '1px solid var(--abi-green)', zIndex: 5, boxShadow: 'var(--shadow-drawer)' }}
           >
-            <span title={tx(L.numHint)} style={{ font: '400 12px var(--font-sans)', color: 'var(--text-secondary)', marginRight: 2 }}>{tx(L.numBar, ref.ch)}</span>
-            {Array.from({ length: count }, (_, i) => i + 1).map((n) => (
+            {/* Une seule sortie dans ce sens : rien à réordonner, seulement la suppression. */}
+            {count > 1 && <span title={tx(L.numHint)} style={{ font: '400 12px var(--font-sans)', color: 'var(--text-secondary)', marginRight: 2 }}>{tx(L.numBar, ref.ch)}</span>}
+            {count > 1 && Array.from({ length: count }, (_, i) => i + 1).map((n) => (
               <button
                 key={n}
                 type="button"
@@ -905,7 +906,7 @@ export function Canvas(props: Props) {
                 onClick={() => n !== ref.num && props.commit(setOutputNum(pivot, ref, n))}
                 style={{ ...btn, background: n === ref.num ? 'var(--abi-green)' : 'var(--surface-nav)', color: '#fff' }}
               >
-                {ref.ch}.{n}
+                {outputTag(ref.ch, n, ref.dir)}
               </button>
             ))}
             <button
@@ -914,7 +915,7 @@ export function Canvas(props: Props) {
               aria-label={tx(L.delLink)}
               className="abi-btn"
               onClick={() => { props.commit(removeLink(pivot, selLink.id)); props.setSel(EMPTY_SEL); }}
-              style={{ ...btn, marginLeft: 4, background: 'var(--abi-tint-red)', color: '#ffd7d3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ ...btn, marginLeft: count > 1 ? 4 : 0, background: 'var(--abi-tint-red)', color: '#ffd7d3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <Icon name="trash" size={14} />
             </button>

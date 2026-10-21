@@ -1,9 +1,9 @@
 // Alignement des traits : un lien est droit quand l'axe du canal de départ et celui du canal d'arrivée
 // coïncident. « Redresser » déplace les EQ presque alignés pour que leurs liens deviennent droits ;
 // l'aimantation propose les mêmes positions pendant un glisser.
-import { eqBox, isHorizontal, opposite, overlaps, sideOffset, type Box } from './geometry';
-import type { Eq, Flow, Pivot } from './pivot';
-import { sideFacing } from './route';
+import { eqBox, isHorizontal, overlaps, sideOffset, type Box } from './geometry';
+import type { Dir, Eq, Flow, Pivot } from './pivot';
+import { arrivalSide, departureSide } from './route';
 
 interface Edge {
   from: string;
@@ -14,9 +14,16 @@ interface Edge {
 }
 
 /** Relation d'un lien : côté de départ face à l'arrivée, axe à aligner (y si côté E/W, x si N/S). */
-function relation(a: Eq, ab: Box, chA: number, b: Eq, bb: Box, chB: number): { axis: 'x' | 'y'; offA: number; offB: number } {
-  const side: Flow = sideFacing(ab, bb);
-  return { axis: isHorizontal(side) ? 'y' : 'x', offA: sideOffset(a, side, chA), offB: sideOffset(b, opposite(side), chB) };
+/**
+ * Relation d'un lien pour l'alignement : côtés de départ et d'arrivée imposés (sens du flux, arrivée
+ * par l'arrière ou le milieu). Un trait ne peut être droit que si ces deux côtés se font face sur le
+ * même axe ; sinon (départ en bas, arrivée à gauche…) rien à aligner.
+ */
+function relation(a: Eq, ab: Box, chA: number, dir: Dir, b: Eq, bb: Box, chB: number): { axis: 'x' | 'y'; offA: number; offB: number } | null {
+  const sSide: Flow = departureSide(a, dir);
+  const tSide: Flow = arrivalSide(b, ab, bb);
+  if (isHorizontal(sSide) !== isHorizontal(tSide)) return null;
+  return { axis: isHorizontal(sSide) ? 'y' : 'x', offA: sideOffset(a, sSide, chA), offB: sideOffset(b, tSide, chB) };
 }
 
 /**
@@ -35,8 +42,8 @@ export function straighten(p: Pivot, only?: Set<string>, tol = 40): Pivot {
       const a = eqs.get(l.from.eq);
       const b = eqs.get(l.to.eq);
       if (!a || !b) continue;
-      const r = relation(a, boxes.get(a.id)!, l.from.ch, b, boxes.get(b.id)!, l.to.ch);
-      if (r.axis !== axis) continue;
+      const r = relation(a, boxes.get(a.id)!, l.from.ch, l.from.dir, b, boxes.get(b.id)!, l.to.ch);
+      if (!r || r.axis !== axis) continue;
       if (Math.abs(a[axis] + r.offA - (b[axis] + r.offB)) > tol) continue;
       edges.push({ from: a.id, to: b.id, offFrom: r.offA, offTo: r.offB });
     }
@@ -133,8 +140,9 @@ export function axisCandidates(p: Pivot, eqId: string, cx: number, cy: number, m
     if (!other) continue;
     const ob = eqBox(other);
     const r = outgoing
-      ? relation(mine, myBox, l.from.ch, other, ob, l.to.ch)
-      : relation(other, ob, l.from.ch, mine, myBox, l.to.ch);
+      ? relation(mine, myBox, l.from.ch, l.from.dir, other, ob, l.to.ch)
+      : relation(other, ob, l.from.ch, l.from.dir, mine, myBox, l.to.ch);
+    if (!r) continue;
     const offMine = outgoing ? r.offA : r.offB;
     const offOther = outgoing ? r.offB : r.offA;
     const want = other[r.axis] + offOther - offMine;

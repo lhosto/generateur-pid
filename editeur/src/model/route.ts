@@ -153,7 +153,6 @@ function hits(a: Pt, b: Pt, o: Box, pad = 5): boolean {
   return x1 > o.x0 - pad && x0 < o.x1 + pad && y1 > o.y0 - pad && y0 < o.y1 + pad;
 }
 
-const clean = (pts: Pt[], obstacles: Box[]) => pts.every((p, i) => i === 0 || !obstacles.some((o) => hits(pts[i - 1], p, o)));
 
 /** Décalages essayés autour du milieu, du plus proche au plus lointain. */
 function offsets(limit: number, step = 10): number[] {
@@ -162,38 +161,6 @@ function offsets(limit: number, step = 10): number[] {
   return out;
 }
 
-/**
- * Tracé face à face : droit si les axes sont alignés, sinon en Z (2 coudes) dont le segment du milieu
- * glisse pour éviter les autres EQ ; si la ligne droite est bouchée, contournement par un décrochement.
- */
-function orthogonal(s: Pt, sSide: Flow, t: Pt, obstacles: Box[], bias = 0): Pt[] {
-  const h = isHorizontal(sSide);
-  const along = (p: Pt) => (h ? p[0] : p[1]);
-  const across = (p: Pt) => (h ? p[1] : p[0]);
-  const pt = (a: number, c: number): Pt => (h ? [a, c] : [c, a]);
-  const dir = Math.sign(along(t) - along(s)) || 1;
-  if (Math.abs(across(s) - across(t)) < 1) {
-    const straight: Pt[] = [s, pt(along(t), across(s))];
-    if (clean(straight, obstacles)) return straight;
-    const a1 = along(s) + dir * 12;
-    const a2 = along(t) - dir * 12;
-    for (const off of offsets(120).slice(1)) {
-      const c = across(s) + off;
-      const p: Pt[] = [s, pt(a1, across(s)), pt(a1, c), pt(a2, c), pt(a2, across(t)), t];
-      if (clean(p, obstacles)) return p;
-    }
-    return straight;
-  }
-  // bias : décalage propre à la sortie, pour que deux sorties voisines ne partagent pas le même coude.
-  const mid = Math.round((along(s) + along(t)) / 20) * 10 + Math.round(bias);
-  const room = Math.max(0, Math.abs(along(t) - along(s)) / 2 - 8);
-  for (const off of offsets(room)) {
-    const m = mid + off;
-    const p: Pt[] = [s, pt(m, across(s)), pt(m, across(t)), t];
-    if (clean(p, obstacles)) return p;
-  }
-  return [s, pt(mid, across(s)), pt(mid, across(t)), t];
-}
 
 /** Boucle sur soi-même : sort côté flux, contourne par le dessus, revient côté opposé. */
 function selfLoop(b: Box, s: Pt, t: Pt, side: Flow): Pt[] {
@@ -207,9 +174,6 @@ function selfLoop(b: Box, s: Pt, t: Pt, side: Flow): Pt[] {
   return [s, [s[0], s[1] + vy * out], [left, s[1] + vy * out], [left, t[1] - vy * out], [t[0], t[1] - vy * out], t];
 }
 
-function lRoute(s: Pt, sSide: Flow, t: Pt): Pt[] {
-  return isHorizontal(sSide) ? [s, [t[0], s[1]], t] : [s, [s[0], t[1]], t];
-}
 
 interface End {
   eq: Eq;
@@ -226,35 +190,88 @@ const endAnchor = (e: End, side: Flow) => anchor(e.box, side, sideOffset(e.eq, s
  * Tracé d'un lien : face à face (droit ou Z) si la voie est libre, sinon en L (départ d'un côté,
  * arrivée par le dessus/dessous ou par le côté), sinon face à face sur l'autre axe.
  */
-function routeLink(a: End, b: End, obstacles: Box[]): Pt[] {
-  const primary = sideFacing(a.box, b.box);
-  const dx = b.box.cx - a.box.cx;
-  const dy = b.box.cy - a.box.cy;
-  const z = (sSide: Flow): Pt[] | null => {
-    const pts = orthogonal(endAnchor(a, sSide), sSide, channelAnchor(b.eq, b.box, opposite(sSide), b.ch), obstacles, a.port);
-    return clean(pts, obstacles) ? pts : null;
+/** Retire les points en double et les points alignés (coudes inutiles). */
+function simplify(pts: Pt[]): Pt[] {
+  const out: Pt[] = [];
+  for (const p of pts) {
+    const q = out[out.length - 1];
+    if (q && Math.abs(q[0] - p[0]) < 0.5 && Math.abs(q[1] - p[1]) < 0.5) continue;
+    out.push(p);
+    while (out.length >= 3) {
+      const [a, b, c] = out.slice(-3);
+      const col = (Math.abs(a[0] - b[0]) < 0.5 && Math.abs(b[0] - c[0]) < 0.5) || (Math.abs(a[1] - b[1]) < 0.5 && Math.abs(b[1] - c[1]) < 0.5);
+      if (!col) break;
+      out.splice(out.length - 2, 1);
+    }
+  }
+  return out;
+}
+
+/**
+ * Relie s (sur le côté sSide) à t (sur le côté tSide) en angles droits : petite sortie de chaque
+ * côté, puis un L ou un Z dont le segment du milieu glisse pour éviter les équipements.
+ * Rend null si aucun tracé libre n'est trouvé.
+ */
+function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], others: Box[], bias: number): Pt[] | null {
+  const [sx, sy] = flowVec(sSide);
+  const [tx, ty] = flowVec(tSide);
+  const p1: Pt = [s[0] + sx * 12, s[1] + sy * 12];
+  // Approche d'arrivée un peu plus longue : la pointe reste visible même si un autre trait passe près.
+  const p2: Pt = [t[0] + tx * 20, t[1] + ty * 20];
+  const all = [...others, ...ends];
+  const ok = (pts: Pt[]) => {
+    const full = simplify(pts);
+    // Le premier et le dernier segment touchent leur équipement : vérifiés contre les autres seulement.
+    for (let i = 1; i < full.length; i++) {
+      const obs = i === 1 || i === full.length - 1 ? others : all;
+      if (obs.some((o) => hits(full[i - 1], full[i], o, 4))) return null;
+    }
+    return full;
   };
-  const l = (sSide: Flow, tSide: Flow): Pt[] | null => {
-    const s = endAnchor(a, sSide);
-    const t = channelAnchor(b.eq, b.box, tSide, b.ch);
-    const pts = lRoute(s, sSide, t);
-    const c = pts[1];
-    const [vx, vy] = flowVec(sSide);
-    const [wx, wy] = flowVec(opposite(tSide));
-    if ((c[0] - s[0]) * vx + (c[1] - s[1]) * vy < 10 || (t[0] - c[0]) * wx + (t[1] - c[1]) * wy < 10) return null;
-    return clean(pts, obstacles) ? pts : null;
-  };
-  const hs: Flow = dx >= 0 ? 'E' : 'W';
-  const vs: Flow = dy >= 0 ? 'S' : 'N';
-  const lh = () => l(hs, dy >= 0 ? 'N' : 'S');
-  const lv = () => l(vs, dx >= 0 ? 'W' : 'E');
-  const other = isHorizontal(primary) ? vs : hs;
+  const tries: Pt[][] = [
+    [s, p1, [p2[0], p1[1]], p2, t],
+    [s, p1, [p1[0], p2[1]], p2, t],
+  ];
+  const mx = Math.round((p1[0] + p2[0]) / 20) * 10 + Math.round(bias);
+  const my = Math.round((p1[1] + p2[1]) / 20) * 10 + Math.round(bias);
+  for (const off of offsets(240)) {
+    tries.push([s, p1, [mx + off, p1[1]], [mx + off, p2[1]], p2, t]);
+    tries.push([s, p1, [p1[0], my + off], [p2[0], my + off], p2, t]);
+  }
+  for (const pts of tries) {
+    const r = ok(pts);
+    if (r) return r;
+  }
+  return null;
+}
+
+/**
+ * Tracé d'un lien entre deux côtés imposés : départ par le sens du flux (aval en marche avant, amont
+ * en marche arrière), arrivée par l'arrière de la cible ou par son milieu (voir arrivalSide).
+ */
+function routeLink(a: End, b: End, obstacles: Box[], sSide: Flow, tSide: Flow): Pt[] {
+  const s0 = endAnchor(a, sSide);
+  const t = channelAnchor(b.eq, b.box, tSide, b.ch);
+  // Côtés imposés par le sens du flux ; si aucun tracé n'évite tout, on accepte de passer sur un équipement.
   return (
-    z(primary) ??
-    (isHorizontal(primary) ? lh() ?? lv() : lv() ?? lh()) ??
-    z(other) ??
-    orthogonal(endAnchor(a, primary), primary, channelAnchor(b.eq, b.box, opposite(primary), b.ch), obstacles, a.port)
+    connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0) ??
+    connectSides(s0, sSide, t, tSide, [], [], a.port ?? 0) ??
+    simplify([s0, t])
   );
+}
+
+/** Côté de départ d'une sortie : côté aval du flux en marche avant, côté amont en marche arrière. */
+export const departureSide = (src: Eq, dir: Dir): Flow => (dir === 'avant' ? src.flow : opposite(src.flow));
+
+/**
+ * Côté d'arrivée sur l'équipement cible. Sans marche arrière programmée, la matière entre par
+ * l'arrière (côté amont du flux, sur l'axe du canal). Avec marche arrière, elle peut partir dans les
+ * deux sens : elle arrive au milieu, par le dessus ou le dessous (côté qui fait face à la source).
+ */
+export function arrivalSide(dst: Eq, src: Box, dstBox: Box): Flow {
+  const reversible = !!dst.options.reverseAllowed && !dst.hg.some((h) => h.type === 'KM');
+  if (!reversible) return opposite(dst.flow);
+  return isHorizontal(dst.flow) ? (src.cy < dstBox.cy ? 'N' : 'S') : src.cx < dstBox.cx ? 'W' : 'E';
 }
 
 /**
@@ -311,16 +328,10 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
     const b = boxes.get(e.id)!;
     const n = e.channels.length;
     const half = ((isHorizontal(e.flow) ? b.h : b.w) / n) / 2 - 3;
-    const steps = Math.ceil((g.length - 1) / 2);
-    const pitch = Math.min(14, half / Math.max(1, steps));
-    // S1 sur l'axe ; les autres rangées selon la position de leur cible (la plus haute / à gauche
-    // prend le départ le plus haut / à gauche) : les traits ne se croisent pas en partant.
-    const hor = isHorizontal(e.flow);
-    const perp = (l: Link) => { const t = boxes.get(l.to.eq); return t ? (hor ? t.cy : t.cx) : 0; };
-    const rest = g.slice(1).sort((x, y) => perp(x) - perp(y));
-    const offs = rest.map((_, i) => (i % 2 ? 1 : -1) * Math.ceil((i + 1) / 2) * pitch).sort((x, y) => x - y);
-    ports.set(g[0].id, 0);
-    rest.forEach((l, i) => ports.set(l.id, offs[i]));
+    // Ordre fixe : S1 sur l'axe du canal, puis S2, S3… toujours à droite (côté horizontal) ou en
+    // dessous (côté vertical), quelle que soit la cible : 1.2 est toujours à droite de 1.1.
+    const pitch2 = Math.min(14, (half * 2 - 3) / Math.max(1, g.length - 1));
+    g.forEach((l, i) => ports.set(l.id, i * pitch2));
   }
 
   const links: RoutedLink[] = [];
@@ -335,7 +346,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
       const sSide = l.from.dir === 'avant' ? src.flow : opposite(src.flow);
       points = selfLoop(a.box, channelAnchor(src, a.box, sSide, a.ch), channelAnchor(src, a.box, opposite(sSide), b.ch), sSide);
     } else {
-      points = routeLink(a, b, obstaclesFor(src.id, dst.id));
+      points = routeLink(a, b, obstaclesFor(src.id, dst.id), departureSide(src, l.from.dir), arrivalSide(dst, a.box, b.box));
     }
     let inner: [Pt, Pt] | undefined;
     if (dst.channels.length > 1 && src.id !== dst.id && points.length >= 2) {
