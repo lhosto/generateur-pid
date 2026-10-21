@@ -92,33 +92,33 @@ export const SYMBOLS: Record<string, SymbolSpec> = {
   OVCA: { base: 'diamond', picto: P.magnetBar, group: 'Séparation' },
   MAGP: { base: 'circle', picto: P.magnet, group: 'Séparation' },
   DOBO: { base: 'para', group: 'Dosage' },
-  SHRE: { base: 'card', picto: P.teeth, group: 'Broyage/divers' },
-  GRAN: { base: 'card', picto: P.dots, group: 'Broyage/divers' },
-  COMP: { base: 'card', picto: P.ram, group: 'Broyage/divers' },
-  PRBA: { base: 'card', picto: P.bale, group: 'Broyage/divers' },
-  PRPA: { base: 'card', picto: P.cube, group: 'Broyage/divers' },
-  PRBR: { base: 'card', picto: P.bricks, group: 'Broyage/divers' },
-  WRAP: { base: 'card', picto: P.spiral, group: 'Broyage/divers' },
+  SHRE: { base: 'card', picto: P.teeth, group: 'Broyage' },
+  GRAN: { base: 'card', picto: P.dots, group: 'Broyage' },
+  COMP: { base: 'card', picto: P.ram, group: 'Broyage' },
+  PRBA: { base: 'card', picto: P.bale, group: 'Broyage' },
+  PRPA: { base: 'card', picto: P.cube, group: 'Broyage' },
+  PRBR: { base: 'card', picto: P.bricks, group: 'Broyage' },
+  WRAP: { base: 'card', picto: P.spiral, group: 'Broyage' },
   DOBU: { base: 'hopper', group: 'Dosage' },
   S: { base: 'silo', group: 'Stockage' },
   SWSD: { base: 'silo', picto: P.weight, group: 'Stockage' },
-  FAN: { base: 'circle', picto: P.fan, group: 'Broyage/divers' },
-  CTA: { base: 'card', picto: P.fan, group: 'Broyage/divers' },
-  DESA: { base: 'card', picto: P.bags, group: 'Broyage/divers' },
-  DECO: { base: 'card', picto: P.burst, group: 'Broyage/divers' },
-  SMFI: { base: 'card', picto: P.smart, group: 'Broyage/divers' },
-  PLEN: { base: 'card', picto: P.plenum, group: 'Broyage/divers' },
-  AIRC: { base: 'circle', picto: P.compressor, group: 'Broyage/divers' },
-  ACD: { base: 'circle', picto: P.drop, group: 'Broyage/divers' },
-  DRYA: { base: 'circle', picto: P.dropX, group: 'Broyage/divers' },
-  DRYR: { base: 'circle', picto: P.snow, group: 'Broyage/divers' },
-  MIST: { base: 'circle', picto: P.mist, group: 'Broyage/divers' },
-  OPCI: { base: 'card', picto: P.eyeFlame, group: 'Broyage/divers' },
-  PCI: { base: 'card', picto: P.flame, group: 'Broyage/divers' },
-  C: { base: 'cabinet', picto: P.door, group: 'Broyage/divers' },
-  P: { base: 'desk', group: 'Broyage/divers' },
-  REMO: { base: 'card', picto: P.remote, group: 'Broyage/divers' },
-  CYL: { base: 'card', picto: P.cylinder, group: 'Broyage/divers' },
+  FAN: { base: 'circle', picto: P.fan, group: 'Divers' },
+  CTA: { base: 'card', picto: P.fan, group: 'Divers' },
+  DESA: { base: 'card', picto: P.bags, group: 'Divers' },
+  DECO: { base: 'card', picto: P.burst, group: 'Divers' },
+  SMFI: { base: 'card', picto: P.smart, group: 'Divers' },
+  PLEN: { base: 'card', picto: P.plenum, group: 'Divers' },
+  AIRC: { base: 'circle', picto: P.compressor, group: 'Divers' },
+  ACD: { base: 'circle', picto: P.drop, group: 'Divers' },
+  DRYA: { base: 'circle', picto: P.dropX, group: 'Divers' },
+  DRYR: { base: 'circle', picto: P.snow, group: 'Divers' },
+  MIST: { base: 'circle', picto: P.mist, group: 'Divers' },
+  OPCI: { base: 'card', picto: P.eyeFlame, group: 'Divers' },
+  PCI: { base: 'card', picto: P.flame, group: 'Divers' },
+  C: { base: 'cabinet', picto: P.door, group: 'Divers' },
+  P: { base: 'desk', group: 'Divers' },
+  REMO: { base: 'card', picto: P.remote, group: 'Divers' },
+  CYL: { base: 'card', picto: P.cylinder, group: 'Divers' },
 };
 
 /**
@@ -126,15 +126,16 @@ export const SYMBOLS: Record<string, SymbolSpec> = {
  * servent de clés (SymbolSpec.group), l'affichage passe par GROUP_LABELS. Seule la Séparation a des
  * sorties négative / positives (− / +) ; ailleurs toutes les sorties sont principales.
  */
-export const GROUP_ORDER = ['Convoyage', 'Séparation', 'Dosage', 'Broyage/divers', 'Stockage', 'Sans symbole'];
+export const GROUP_ORDER = ['Convoyage', 'Séparation', 'Dosage', 'Broyage', 'Stockage', 'Divers', 'Sans symbole'];
 
 /** Libellé affiché de chaque famille (français / anglais). */
 export const GROUP_LABELS: Record<string, Entry> = {
   'Convoyage': { fr: 'Convoyage', en: 'Conveying' },
   'Séparation': { fr: 'Séparation', en: 'Separation' },
   'Dosage': { fr: 'Dosage', en: 'Dosing' },
-  'Broyage/divers': { fr: 'Broyage / divers', en: 'Shredding / misc.' },
+  'Broyage': { fr: 'Broyage', en: 'Shredding' },
   'Stockage': { fr: 'Stockage', en: 'Storage' },
+  'Divers': { fr: 'Divers', en: 'Miscellaneous' },
   'Sans symbole': { fr: 'Sans symbole', en: 'No symbol' },
 };
 
