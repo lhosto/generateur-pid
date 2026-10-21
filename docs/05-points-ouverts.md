@@ -37,3 +37,4 @@
 | Départs de plusieurs sorties sur un canal | Groupe centré sur l'axe du canal, réparti dans la bande du canal (S1 à gauche / en haut, S2… à droite / en dessous) ; sorties en attente comprises. Étiquettes 1.1, 1.2 dès 2 sorties sur un canal | Décidé | 21/10/2026 |
 | Taille selon les canaux | Plus de canaux = forme plus épaisse, jamais plus longue | Décidé | 21/10/2026 |
 | Traits parallèles | Deux traits vers des équipements différents restent à 8 px au moins l'un de l'autre ; vers le même point d'arrivée, ils se rejoignent | Décidé | 21/10/2026 |
+| Réorganiser (ELK) | Essai sur la branche essai/routage-libavoid-elk : bouton « Réorganiser » (tout, ou la sélection dès 2 EQ) ; ELK place les EQ en colonnes dans le sens du flux, les traits restent ceux de l'utilisateur et sont redessinés par le routage maison ; goulottes rangées à part ; annulable. +1,5 Mo dans le HTML. Prévu V2 au cahier des charges : à garder en V1 ? | | |

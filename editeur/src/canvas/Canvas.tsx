@@ -6,7 +6,7 @@ import { boxAt, CH_PITCH, channelOffset, CHUTE_SIZE, eqBox, hg0Of, flowVec, isHo
 import { axisCandidates } from '../model/straighten';
 import { guideSnap } from '../model/align';
 import {
-  addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, removeLink, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
+  addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, removeLink, removeOutput, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
   placeNext, setLinkTarget,
 } from '../model/ops';
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
@@ -176,6 +176,8 @@ const L = {
   delLink: { fr: 'Supprimer le trait et sa sortie (Suppr)', en: 'Delete the link and its output (Del)' },
   menuOther: { fr: 'Autre équipement…', en: 'Other Equipment item…' },
   menuOtherSub: { fr: 'ouvrir la liste complète', en: 'open the full list' },
+  menuDelete: { fr: 'Supprimer cette sortie', en: 'Delete this output' },
+  menuDeleteSub: { fr: 'elle n’est pas raccordée (Suppr)', en: 'it is not connected (Del)' },
   undo: { fr: ' · Ctrl+Z pour annuler', en: ' · Ctrl+Z to undo' },
   zoomOut: { fr: 'Zoom arrière', en: 'Zoom out' },
   zoomIn: { fr: 'Zoom avant', en: 'Zoom in' },
@@ -185,6 +187,10 @@ const L = {
   // Libellé par défaut d'une goulotte (ops.DEFAULT_CHUTE_LABEL) : la donnée reste en français, seul l'affichage est traduit.
   chute: { fr: 'Goulotte de tri', en: 'Sorting chute' },
   // Infobulle native (texte simple, via plain) : l'action déplace des équipements, pas des traits.
+  reorganize: {
+    fr: 'Réorganiser : range les équipements [EQ] en colonnes dans le sens du flux, avec moins de croisements (tous, ou la sélection). Les traits ne changent pas. Ctrl+Z pour annuler',
+    en: 'Reorganize: arranges Equipment items [EQ] in columns along the flow, with fewer crossings (all, or the selection). Links are unchanged. Ctrl+Z to undo',
+  },
   straighten: {
     fr: 'Redresser les liens : déplace les équipements [EQ] presque alignés pour que leurs liens deviennent droits',
     en: 'Straighten links: moves nearly aligned Equipment items [EQ] so that their links become straight',
@@ -520,6 +526,13 @@ export function Canvas(props: Props) {
       }
       force((n) => n + 1);
     }
+  };
+
+  /** Supprime une sortie en attente (depuis son menu) ; les sorties suivantes du canal se renumérotent. */
+  const dropPending = (ref: OutputRef) => {
+    setMenu(null);
+    props.commit(removeOutput(live.current.pivot, ref));
+    props.setSel(EMPTY_SEL);
   };
 
   /** Crée l'équipement choisi dans le menu du « + », déjà raccordé à la sortie. */
@@ -970,6 +983,10 @@ export function Canvas(props: Props) {
                 e.preventDefault();
                 setMenu(null);
               } else if (e.key === 'Tab') setMenu(null);
+              else if ((e.key === 'Delete' || e.key === 'Backspace') && menu.ref) {
+                e.preventDefault();
+                dropPending(menu.ref);
+              }
               else if (e.key === 'ArrowDown') go(at + 1);
               else if (e.key === 'ArrowUp') go(at < 0 ? -1 : at - 1);
               else if (e.key === 'Home') go(0);
@@ -1012,6 +1029,16 @@ export function Canvas(props: Props) {
                 <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{tx(L.menuOtherSub)}</span>
               </span>
             </button>
+            {/* Sortie en attente : on peut aussi la supprimer d'ici (le menu garde le clavier). */}
+            {menu.ref && (
+              <button type="button" role="menuitem" className="abi-row" onClick={() => dropPending(menu.ref!)} style={{ ...row, padding: '9px 10px', borderTop: '1px solid var(--border-divider)' }}>
+                <Icon name="trash" size={18} color="var(--pid-fault-stroke)" />
+                <span style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ font: '500 13px var(--font-sans)' }}>{tx(L.menuDelete)}</span>
+                  <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{tx(L.menuDeleteSub)}</span>
+                </span>
+              </button>
+            )}
           </div>
         );
       })()}
@@ -1157,8 +1184,8 @@ function Handles(props: {
   );
 }
 
-export const ZoomBar = ({ view, onZoom, onFit, grid, onGrid, onStraighten }: {
-  view: View; onZoom: (k: number) => void; onFit: () => void; grid: boolean; onGrid: () => void; onStraighten: () => void;
+export const ZoomBar = ({ view, onZoom, onFit, grid, onGrid, onStraighten, onReorganize }: {
+  view: View; onZoom: (k: number) => void; onFit: () => void; grid: boolean; onGrid: () => void; onStraighten: () => void; onReorganize: () => void;
 }) => (
   <div style={{ position: 'absolute', left: 12, top: 12, display: 'flex', gap: 4, alignItems: 'center', background: 'var(--surface-page)', border: '1px solid var(--border-nav)', padding: 4, zIndex: 3 }}>
     <ToolBtn icon="zoom-out" title={tx(L.zoomOut)} onClick={() => onZoom(1 / 1.2)} />
@@ -1168,6 +1195,7 @@ export const ZoomBar = ({ view, onZoom, onFit, grid, onGrid, onStraighten }: {
     <span style={{ width: 1, height: 22, background: 'var(--border-nav)', margin: '0 2px' }} />
     <ToolBtn icon="grid" title={tx(L.grid)} on={grid} onClick={onGrid} />
     <ToolBtn icon="straighten" title={plain(tx(L.straighten))} onClick={onStraighten} />
+    <ToolBtn icon="workflow" title={plain(tx(L.reorganize))} onClick={onReorganize} />
   </div>
 );
 

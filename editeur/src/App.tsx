@@ -10,6 +10,7 @@ import type { Pivot } from './model/pivot';
 import { incompleteReasons } from './model/rules';
 import { loadSaved, usePivotHistory } from './model/store';
 import { straighten } from './model/straighten';
+import { reorganize } from './model/layout';
 import { EqDrawer } from './panels/EqDrawer';
 import { AlignBar, BaseSettingsDialog, CatalogueBanner, ReportPanel } from './panels/Overlays';
 import { Palette } from './panels/Palette';
@@ -51,6 +52,11 @@ const L = {
   opened: { fr: (name: string) => 'Pivot ouvert : ' + name, en: (name: string) => 'Pivot opened: ' + name },
   alreadyStraight: { fr: 'Liens déjà droits', en: 'Links already straight' },
   straightened: { fr: 'Liens redressés', en: 'Links straightened' },
+  reorganized: {
+    fr: (n: number, over: boolean) => `${n} équipements réorganisés${over ? ' — le schéma dépasse l’écran 1920 × 1080' : ''} · Ctrl+Z pour annuler`,
+    en: (n: number, over: boolean) => `${n} Equipment items reorganized${over ? ' — the diagram exceeds the 1920 × 1080 screen' : ''} · Ctrl+Z to undo`,
+  },
+  reorgFailed: { fr: 'Réorganisation impossible', en: 'Reorganization failed' },
   // Choix sur la planche des symboles : proposé en « dernier choix » dans le menu des « + », après le convoyeur.
   plusNature: { fr: (label: string) => 'Proposé dans le menu des « + » : ' + label, en: (label: string) => 'Offered in the “+” menu: ' + label },
   // Barre d'état
@@ -184,6 +190,18 @@ export function App() {
   ];
   const onAlign = (m: AlignMode) => commit(setPositions(pivot, align(items(), m)));
   const onDistribute = (a: Axis) => commit(setPositions(pivot, distribute(items(), a)));
+  // Réorganiser : ELK place les équipements (tous, ou la sélection dès 2), les traits restent ceux de l'utilisateur.
+  const reorganizeAll = async () => {
+    const only = sel.eqs.length >= 2 ? new Set(sel.eqs) : undefined;
+    try {
+      const r = await reorganize(pivot, only);
+      commit(r.p);
+      const over = r.bounds.x0 < 0 || r.bounds.y0 < 0 || r.bounds.x1 > SCREEN.w || r.bounds.y1 > SCREEN.h;
+      say(tx(L.reorganized, only ? only.size : pivot.equipments.length, over));
+    } catch {
+      say(tx(L.reorgFailed));
+    }
+  };
   const straightenAll = (only?: Set<string>) => {
     const next = straighten(pivot, only);
     if (next === pivot) return say(tx(L.alreadyStraight));
@@ -327,7 +345,7 @@ export function App() {
               onPickOther={(apply) => setSheet({ pick: apply })}
               onChosen={setCurrent}
             />
-            <ZoomBar view={view} onZoom={zoomBy} onFit={fit} grid={grid} onGrid={() => setGrid(!grid)} onStraighten={() => straightenAll()} />
+            <ZoomBar view={view} onZoom={zoomBy} onFit={fit} grid={grid} onGrid={() => setGrid(!grid)} onStraighten={() => straightenAll()} onReorganize={reorganizeAll} />
             {selCount >= 2 && <AlignBar count={selCount} onAlign={onAlign} onDistribute={onDistribute} onStraighten={() => straightenAll(new Set(sel.eqs))} />}
             {report && <ReportPanel items={report} eqName={eqName} onPick={(id) => { setSel({ ...EMPTY_SEL, eqs: [id] }); centerOn(id); }} onClose={() => setReportSrc(null)} />}
             {drawer && (
