@@ -91,6 +91,10 @@ export function App() {
   const size = useRef({ w: 1200, h: 700 });
   const fitted = useRef(false);
   const [drawer, setDrawer] = useState<string | null>(null);
+  // Fiche ouverte : elle suit l'équipement sélectionné (clic sur un autre équipement → sa fiche).
+  useEffect(() => {
+    if (drawer && sel.eqs.length === 1 && sel.eqs[0] !== drawer) setDrawer(sel.eqs[0]);
+  }, [sel.eqs, drawer]);
   const [current, setCurrent] = useState('BELT');
   // Planche des HG principaux : consultation (HG proposé dans le menu des « + ») ou choix de l'équipement à ajouter.
   const [sheet, setSheet] = useState<null | { pick?: (hg0: string) => void }>(null);

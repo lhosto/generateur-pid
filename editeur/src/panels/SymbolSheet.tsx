@@ -1,11 +1,12 @@
 // Planche des symboles : un visuel distinct par HG principal de la liste HG. Sert à valider la
 // proposition puis à remplir la colonne « P&D - Symbole » de la liste SharePoint.
+import { useState } from 'react';
 import { etatLabel, principals, type Catalogue } from '../model/catalogue';
 import { boxAt, sizeOf } from '../model/geometry';
 import { GROUP_ORDER, groupLabel, symbolOf, type Base } from '../model/symbols';
 import { haloOf, labelPos, Shape, Tag } from '../canvas/symbols';
 import { Abbr, getLang, hgLabel, tx, type Entry } from '../i18n';
-import { Button, PanelHead } from '../ui/ui';
+import { Button, Icon, inputStyle, PanelHead } from '../ui/ui';
 
 const L = {
   sheet: { fr: 'Planche des symboles', en: 'Symbol chart' },
@@ -40,6 +41,9 @@ const L = {
   },
   wincc: { fr: 'ID WinCC', en: 'WinCC ID' },
   noEtat: { fr: 'état —', en: 'status —' },
+  search: { fr: 'Chercher : code, nom, famille… (Entrée = premier résultat)', en: 'Search: code, name, family… (Enter = first result)' },
+  none: { fr: (q: string) => `Aucun matériel ne correspond à « ${q} ».`, en: (q: string) => `No hardware matches “${q}”.` },
+  count: { fr: (n: number) => `${n} résultat${n > 1 ? 's' : ''}`, en: (n: number) => `${n} result${n > 1 ? 's' : ''}` },
 };
 
 // Nom affiché des formes de base (la clé reste l'identifiant interne de symbols.ts).
@@ -71,12 +75,22 @@ function Big({ hg0 }: { hg0: string }) {
 }
 
 export function SymbolSheet({ cat, mode = 'browse', onClose, onPick }: { cat: Catalogue; mode?: 'browse' | 'pick'; onClose: () => void; onPick: (code: string) => void }) {
-  const codes = principals(cat);
+  const [q, setQ] = useState('');
+  // Recherche sans accents ni casse, sur le code, les libellés FR / EN et la famille ; tous les mots doivent figurer.
+  const norm = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const words = norm(q).split(/\s+/).filter(Boolean);
+  const all = principals(cat);
+  const codes = all.filter((k) => {
+    const d = cat.hgTypes[k];
+    const hay = norm([k, d.label, d.labelEn, groupLabel(symbolOf(k).group)].join(' '));
+    return words.every((w) => hay.includes(w));
+  });
   const groups = GROUP_ORDER.filter((g) => codes.some((k) => symbolOf(k).group === g));
+  const ordered = groups.flatMap((g) => codes.filter((k) => symbolOf(k).group === g));
   return (
     <div role="dialog" aria-modal="true" aria-label={tx(L.sheet)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }} onPointerDown={onClose}>
       <div style={{ width: 'min(1500px, 94vw)', height: '88vh', display: 'flex', flexDirection: 'column', background: 'var(--surface-page)', border: '1px solid var(--surface-panel-header)' }} onPointerDown={(e) => e.stopPropagation()}>
-        <PanelHead icon="grid" title={mode === 'pick' ? <>{tx(L.pickTitle)}<Abbr>EQ</Abbr> {tx(L.pickTitleEnd)}</> : <>{tx(L.title, codes.length)}<Abbr>HG</Abbr></>} right={<Button variant="ghost" icon="x" title={tx(L.close)} onClick={onClose} />} />
+        <PanelHead icon="grid" title={mode === 'pick' ? <>{tx(L.pickTitle)}<Abbr>EQ</Abbr> {tx(L.pickTitleEnd)}</> : <>{tx(L.title, all.length)}<Abbr>HG</Abbr></>} right={<Button variant="ghost" icon="x" title={tx(L.close)} onClick={onClose} />} />
         {mode === 'pick' ? (
           <p style={{ margin: 0, padding: '10px 12px', font: '400 13px/1.45 var(--font-sans)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-divider)' }}>
             {tx(L.pickIntro)}
@@ -91,7 +105,27 @@ export function SymbolSheet({ cat, mode = 'browse', onClose, onPick }: { cat: Ca
             {tx(L.report)} {tx(L.pick)}
           </p>
         )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--border-divider)' }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: 520 }}>
+            <input
+              autoFocus
+              aria-label={tx(L.search)}
+              placeholder={tx(L.search)}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && ordered[0]) onPick(ordered[0]);
+                if (e.key === 'Escape') (q ? setQ('') : onClose());
+                e.stopPropagation();
+              }}
+              style={{ ...inputStyle, height: 34, paddingLeft: 32, fontSize: 15 }}
+            />
+            <Icon name="search" size={18} color="var(--text-muted)" style={{ position: 'absolute', left: 8, top: 8 }} />
+          </div>
+          {q && <span style={{ font: '400 12px var(--font-sans)', color: 'var(--text-muted)' }}>{tx(L.count, codes.length)}</span>}
+        </div>
         <div style={{ overflow: 'auto', flex: 1, padding: '4px 12px 16px' }}>
+          {q && !codes.length && <p style={{ margin: '16px 0', font: '400 14px var(--font-sans)', color: 'var(--text-muted)' }}>{tx(L.none, q)}</p>}
           {groups.map((g) => (
             <section key={g}>
               <h3 style={{ margin: '16px 0 8px', font: '700 12px var(--font-sans)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{groupLabel(g)}</h3>

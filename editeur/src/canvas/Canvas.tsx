@@ -10,7 +10,7 @@ import {
   setLinkTarget,
 } from '../model/ops';
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
-import { handlePositions, outputColor, routeAll, type Pt } from '../model/route';
+import { handlePositions, loopLinks, outputColor, outputTag, routeAll, tagAnchor, type Pt } from '../model/route';
 import {
   canAddChannel, canAddOutput, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
   zoneOf,
@@ -104,6 +104,8 @@ const DEFAULT_NEXT = 'BELT';
  * vertical (le haut y est pris par les « + » des sorties). L'écart rejoint la zone de clic de l'équipement.
  */
 const TAB = { w: 76, h: 16, gap: 4 };
+/** Étiquette « canal.sortie » d'un trait : petite, chasse fixe, halo du fond pour rester lisible sur les traits. */
+const TAG_STYLE: React.CSSProperties = { font: '600 8.5px var(--font-tag)', fill: 'var(--pid-caption)', paintOrder: 'stroke', stroke: 'var(--pid-bg)', strokeWidth: 3, strokeLinejoin: 'round', pointerEvents: 'none' };
 
 // Textes du canevas : français pour l'opérateur, anglais préparé.
 // « [CH] » dans un texte = terme technique affiché en petit après le mot simple (voir i18n.rich).
@@ -117,6 +119,7 @@ const L = {
     fr: 'Clic : sélectionner\nPuis glisser la pastille de la flèche vers un autre canal [CH]',
     en: 'Click: select\nThen drag the arrowhead dot to another Channel [CH]',
   },
+  loop: { fr: '↺ Boucle : la matière revient vers un équipement en amont', en: '↺ Loop: material returns to an upstream Equipment item' },
   stubHint: { fr: 'Sortie non reliée : glisser vers un équipement [EQ]', en: 'Output not connected: drag onto an Equipment item [EQ]' },
   retarget: {
     fr: 'Glisser pour changer de canal [CH] ou d’équipement [EQ] d’arrivée',
@@ -213,6 +216,7 @@ export function Canvas(props: Props) {
   // Les libellés des liens (outputLabel) sont traduits : recalcul aussi au changement de langue.
   const lang = getLang();
   const routed = useMemo(() => routeAll(pivot), [pivot, lang]);
+  const loops = useMemo(() => loopLinks(pivot), [pivot.links, pivot.equipments]);
   const selEqs = useMemo(() => new Set(sel.eqs), [sel.eqs]);
 
   // Taille du conteneur (pour « ajuster »).
@@ -589,7 +593,7 @@ export function Canvas(props: Props) {
   };
 
   /** Infobulle d'un lien : phrase simple, puis noms techniques en petit. */
-  const linkTip = (lk: { from: OutputRef; to: { eq: string; ch: number } }): TipLine[] => {
+  const linkTip = (lk: { id: string; from: OutputRef; to: { eq: string; ch: number } }): TipLine[] => {
     const a = findEq(pivot, lk.from.eq);
     const b = findEq(pivot, lk.to.eq);
     const ra = a?.repere || '?';
@@ -598,6 +602,7 @@ export function Canvas(props: Props) {
     return [
       { text: tx(L.linkTitle, ra, rb), kind: 'title' },
       { text: tx(L.linkSub, lk.from.num, fwd, polarity(lk.from.num), lk.from.ch, (a?.channels.length ?? 1) > 1, lk.to.ch, (b?.channels.length ?? 1) > 1), kind: 'sub' },
+      ...(loops.has(lk.id) ? [{ text: tx(L.loop), kind: 'sub' as const }] : []),
       { text: `${ra}_CH${pad2(lk.from.ch)} · S${lk.from.num} → ${rb}_CH${pad2(lk.to.ch)}`, kind: 'tech' },
       { text: rich(tx(L.linkHint)), kind: 'hint' },
     ];
@@ -700,6 +705,14 @@ export function Canvas(props: Props) {
                     strokeDasharray={l.dashed ? '5 5' : undefined}
                     markerEnd={`url(#${on ? 'arw-sel' : 'arw-' + Math.min(l.num, 6)})`}
                   />
+                  {(() => {
+                    const ta = tagAnchor(l.points);
+                    return (
+                      <text x={ta.x} y={ta.y} textAnchor={ta.anchor} dominantBaseline="central" style={{ ...TAG_STYLE, fill: on ? 'var(--pid-select)' : TAG_STYLE.fill }}>
+                        {outputTag(l.link.from.ch, l.link.from.num, l.link.from.dir)}{loops.has(l.id) ? ' ↺' : ''}
+                      </text>
+                    );
+                  })()}
                 </g>
               );
             })}
@@ -720,6 +733,9 @@ export function Canvas(props: Props) {
                   <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="transparent" strokeWidth={10} />
                   <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={on ? 'var(--pid-select)' : outputColor(s.num)} strokeWidth={2} strokeDasharray={s.dashed ? '4 3' : undefined} />
                   <circle cx={b[0]} cy={b[1]} r={3.5} fill="var(--pid-bg)" stroke={on ? 'var(--pid-select)' : outputColor(s.num)} strokeWidth={1.5} />
+                  <text x={b[0] + (b[0] - a[0]) * 0.4 + (a[0] === b[0] ? 6 : 0)} y={b[1] + (b[1] - a[1]) * 0.4 - (a[1] === b[1] ? 7 : 0)} textAnchor={a[0] === b[0] ? 'start' : 'middle'} dominantBaseline="central" style={TAG_STYLE}>
+                    {outputTag(s.ref.ch, s.ref.num, s.ref.dir)}
+                  </text>
                 </g>
               );
             })}

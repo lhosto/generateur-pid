@@ -22,6 +22,10 @@ const L = {
   },
   // Légende
   outputs: { fr: 'Sorties', en: 'Outputs' },
+  forwardLine: { fr: 'marche avant', en: 'forward' },
+  reverseLine: { fr: 'marche arrière (AR)', en: 'reverse (AR)' },
+  tagMeaning: { fr: 'canal 1, sortie 2', en: 'channel 1, output 2' },
+  loopMeaning: { fr: 'boucle, retour en amont', en: 'loop, back upstream' },
   colorsTbc: { fr: 'couleurs à valider', en: 'colors to be confirmed' },
   negative: { fr: 'négative', en: 'negative' },
   positive: { fr: 'positive', en: 'positive' },
@@ -142,12 +146,19 @@ export function Legend() {
   return (
     <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border-divider)', font: '400 11px var(--font-sans)', color: 'var(--pid-caption)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', font: '700 11px var(--font-sans)', textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>
-        {tx(L.outputs)} <span style={{ color: 'var(--pid-warn)', textTransform: 'none', fontWeight: 400 }}>{tx(L.colorsTbc)}</span>
+        {tx(L.outputs)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 8 }}>
-        {/* S1… S6 : numéros de sortie du PID, non traduits (comme la fiche et outputLabel) */}
-        {[1, 2, 3, 4, 5, 6].map((n) => item(String(n), outputColor(n), `S${n} ${tx(n === 1 ? L.negative : L.positive)}`))}
-        {item('ar', 'var(--pid-stroke-light)', tx(L.reverse), '4 3')}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {item('av', outputColor(1), tx(L.forwardLine))}
+        {item('ar', outputColor(1), tx(L.reverseLine), '4 3')}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
+          <span style={{ width: 22, font: '600 9px var(--font-tag)', color: 'var(--pid-caption)', textAlign: 'center' }}>1.2</span>
+          {tx(L.tagMeaning)}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
+          <span style={{ width: 22, font: '600 10px var(--font-tag)', color: 'var(--pid-caption)', textAlign: 'center' }}>↺</span>
+          {tx(L.loopMeaning)}
+        </span>
       </div>
     </div>
   );

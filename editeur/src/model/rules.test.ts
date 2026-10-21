@@ -8,7 +8,7 @@ import { SYMBOLS } from './symbols';
 import { straighten } from './straighten';
 import { boxAt, eqBox } from './geometry';
 import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, setChainType } from './ops';
-import { routeAll } from './route';
+import { loopLinks, routeAll } from './route';
 import {
   canAddOutput, defaultStack, hgName, hsName, incompleteReasons, isFirstChannel, MAX, nextOutputNum, reverseBlocked, suggestRepere,
 } from './rules';
@@ -253,5 +253,14 @@ describe('repères en double et formes orientées', () => {
     expect(b2.h).toBeGreaterThan(b2.w);
     const flat = eqBox(createEq(cat, emptyPivot(cat), 'BELT', 0, 0, { flow: 'E', channels: 2 }));
     expect(flat.w).toBeGreaterThan(flat.h);
+  });
+});
+
+describe('boucles', () => {
+  it('repère le lien qui ferme une recirculation, pas la marche arrière', () => {
+    const p = siteTest(cat);
+    const rep = (id: string) => p.equipments.find((e) => e.id === id)!.repere;
+    const loops = [...loopLinks(p)].map((id) => p.links.find((l) => l.id === id)!).map((l) => `${rep(l.from.eq)}>${rep(l.to.eq)}`);
+    expect(loops).toEqual(['27Pb>08Ae']);
   });
 });

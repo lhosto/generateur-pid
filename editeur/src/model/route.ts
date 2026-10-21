@@ -27,7 +27,32 @@ export interface Stub {
 
 const POINTY = new Set(['diamond', 'circle']);
 
-export const outputColor = (num: number) => `var(--out-${Math.min(Math.max(num, 1), 6)})`;
+/**
+ * Couleur d'un trait. Couleurs par sortie retirées pour le moment (demande d'Alex du 21/10) : trait neutre ;
+ * la sortie se lit sur l'étiquette « canal.sortie » et la marche arrière sur le pointillé.
+ */
+export const outputColor = (_num: number) => 'var(--pid-stroke-light)';
+
+/** Étiquette courte d'une sortie : « 1.2 » = canal 1, sortie 2 ; « AR » en marche arrière. */
+export const outputTag = (ch: number, num: number, dir: Dir) => `${ch}.${num}${dir === 'arriere' ? ' AR' : ''}`;
+
+/**
+ * Où écrire l'étiquette d'un lien : juste après son premier coude, là où il quitte le tronc commun des
+ * autres sorties du même canal (sinon un peu après le départ). Rend le point et le côté du texte.
+ */
+export function tagAnchor(points: Pt[]): { x: number; y: number; anchor: 'start' | 'middle' } {
+  const [s, b] = points;
+  if (points.length > 2) {
+    const c = points[2];
+    const vertical = Math.abs(c[0] - b[0]) < 1;
+    // Sur un segment vertical : à droite du coude, un peu plus bas/haut ; sur un horizontal : au-dessus.
+    if (vertical) return { x: b[0] + 4, y: b[1] + Math.sign(c[1] - b[1]) * 9, anchor: 'start' };
+    return { x: b[0] + Math.sign(c[0] - b[0]) * 12, y: b[1] - 4, anchor: 'middle' };
+  }
+  const dx = Math.sign(b[0] - s[0]);
+  const dy = Math.sign(b[1] - s[1]);
+  return dx !== 0 ? { x: s[0] + dx * 12, y: s[1] - 4, anchor: 'middle' } : { x: s[0] + 4, y: s[1] + dy * 12, anchor: 'start' };
+}
 
 export function sideFacing(a: Box, b: Box): Flow {
   const dx = b.cx - a.cx;
@@ -154,6 +179,37 @@ function routeLink(a: End, b: End, obstacles: Box[]): Pt[] {
     z(other) ??
     orthogonal(channelAnchor(a.eq, a.box, primary, a.ch), primary, channelAnchor(b.eq, b.box, opposite(primary), b.ch), obstacles)
   );
+}
+
+/**
+ * Liens qui bouclent (recirculation) : un lien de marche avant qui revient vers un équipement déjà
+ * traversé en amont. Parcours en profondeur depuis les entrées de ligne (équipements où rien n'arrive),
+ * dans l'ordre du pivot ; un lien vers un équipement encore « en cours » de parcours ferme une boucle.
+ * Les liens de marche arrière ne comptent pas : ce sont des données à part (pointillé « AR »).
+ */
+export function loopLinks(p: Pivot): Set<string> {
+  const out = new Map<string, Link[]>();
+  const fed = new Set<string>();
+  for (const l of p.links) {
+    if (l.from.dir !== 'avant' || l.from.eq === l.to.eq) continue;
+    if (!out.has(l.from.eq)) out.set(l.from.eq, []);
+    out.get(l.from.eq)!.push(l);
+    fed.add(l.to.eq);
+  }
+  const loops = new Set<string>();
+  const state = new Map<string, 1 | 2>(); // 1 = en cours, 2 = terminé
+  const visit = (id: string) => {
+    state.set(id, 1);
+    for (const l of out.get(id) ?? []) {
+      const s = state.get(l.to.eq);
+      if (s === 1) loops.add(l.id);
+      else if (!s) visit(l.to.eq);
+    }
+    state.set(id, 2);
+  };
+  const starts = [...p.equipments.filter((e) => !fed.has(e.id)), ...p.equipments];
+  for (const e of starts) if (!state.has(e.id)) visit(e.id);
+  return loops;
 }
 
 export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
