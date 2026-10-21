@@ -10,7 +10,7 @@ import {
   placeNext, setLinkTarget, updateEq,
 } from '../model/ops';
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
-import { handlePositions, loopLinks, outputColor, placeTags, shortTag, tagFor, routeAll, tagAnchor, type Pt } from '../model/route';
+import { handlePositions, loopLinks, outputColor, placeTags, shortTag, tagFor, arMark, routeAll, tagAnchor, type Pt } from '../model/route';
 import {
   canAddChannel, canAddOutput, freeOutputNum, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
   chainRepere, zoneOf,
@@ -19,6 +19,7 @@ import { Icon } from '../ui/ui';
 import { Glyph } from '../panels/Palette';
 import { EqNode } from './EqNode';
 import { ChuteShape, labelPos } from './symbols';
+import { isSeparation } from '../model/symbols';
 
 export interface Selection {
   eqs: string[];
@@ -108,6 +109,9 @@ const DEFAULT_NEXT = 'BELT';
 const TAB = { w: 76, h: 16, gap: 4 };
 /** Étiquette « canal.sortie » d'un trait : petite, chasse fixe, halo du fond pour rester lisible sur les traits. */
 const TAG_STYLE: React.CSSProperties = { font: '600 8.5px var(--font-tag)', fill: 'var(--pid-caption)', paintOrder: 'stroke', stroke: 'var(--pid-bg)', strokeWidth: 3, strokeLinejoin: 'round', pointerEvents: 'none' };
+
+/** Trait d'un lien : tirets pour la marche arrière, pointillé rond pour un retour de boucle, plein sinon. */
+const lineDash = (reverse: boolean, loop: boolean) => (reverse ? '5 5' : loop ? '0.1 5' : undefined);
 
 /** Texte d'étiquette de sortie : les signes − et + en gras et un peu plus grands, le reste normal. */
 const tagText = (t: string) =>
@@ -239,8 +243,11 @@ export function Canvas(props: Props) {
   const lang = getLang();
   const routed = useMemo(() => routeAll(pivot), [pivot, lang]);
   const loops = useMemo(() => loopLinks(pivot), [pivot.links, pivot.equipments]);
+  // Étiquette d'un lien : repère de sortie, puis ↺ pour un retour de boucle (comme « AR » pour la marche arrière).
+  const linkTag = (lk: Pivot['links'][number], loop: boolean) =>
+    [shortTag(findEq(pivot, lk.from.eq), lk.from.ch, lk.from.num, lk.from.dir), loop ? '↺' : ''].filter(Boolean).join(' ');
   const tags = useMemo(
-    () => placeTags(pivot, routed.links, (l) => shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir)),
+    () => placeTags(pivot, routed.links, (l) => linkTag(l.link, loops.has(l.id))),
     [pivot, routed, loops],
   );
   const selEqs = useMemo(() => new Set(sel.eqs), [sel.eqs]);
@@ -653,7 +660,7 @@ export function Canvas(props: Props) {
     const fwd = lk.from.dir === 'avant';
     return [
       { text: tx(L.linkTitle, ra, rb), kind: 'title' },
-      { text: tx(L.linkSub, lk.from.num, fwd, polarity(lk.from.num, a ? outputsOf(a, lk.from.ch, lk.from.dir).length : 1), lk.from.ch, (a?.channels.length ?? 1) > 1, lk.to.ch, (b?.channels.length ?? 1) > 1), kind: 'sub' },
+      { text: tx(L.linkSub, lk.from.num, fwd, polarity(lk.from.num, a ? outputsOf(a, lk.from.ch, lk.from.dir).length : 1, isSeparation(a?.hg[0]?.type ?? '')), lk.from.ch, (a?.channels.length ?? 1) > 1, lk.to.ch, (b?.channels.length ?? 1) > 1), kind: 'sub' },
       ...(loops.has(lk.id) ? [{ text: tx(L.loop), kind: 'sub' as const }] : []),
       { text: `${ra}_CH${pad2(lk.from.ch)} · S${lk.from.num} → ${rb}_CH${pad2(lk.to.ch)}`, kind: 'tech' },
       { text: rich(tx(L.linkHint)), kind: 'hint' },
@@ -665,7 +672,7 @@ export function Canvas(props: Props) {
     const ra = a?.repere || '?';
     return [
       { text: tx(L.stubTitle, ref.num, ref.dir === 'avant'), kind: 'title' },
-      { text: tx(L.outSub, polarity(ref.num, a ? outputsOf(a, ref.ch, ref.dir).length : 1), ref.ch, (a?.channels.length ?? 1) > 1), kind: 'sub' },
+      { text: tx(L.outSub, polarity(ref.num, a ? outputsOf(a, ref.ch, ref.dir).length : 1, isSeparation(a?.hg[0]?.type ?? '')), ref.ch, (a?.channels.length ?? 1) > 1), kind: 'sub' },
       { text: `${ra}_CH${pad2(ref.ch)} · S${ref.num}`, kind: 'tech' },
       { text: rich(tx(L.stubHint)), kind: 'hint' },
     ];
@@ -761,27 +768,11 @@ export function Canvas(props: Props) {
                   <polyline
                     points={pts}
                     stroke={on ? 'var(--pid-select)' : outputColor(l.num)}
-                    strokeWidth={on || hot ? 2.6 : l.dashed ? 1.6 : 2}
-                    strokeDasharray={l.dashed ? '5 5' : undefined}
+                    strokeWidth={on || hot ? 2.6 : l.dashed ? 1.6 : loops.has(l.id) ? 2.4 : 2}
+                    strokeDasharray={lineDash(l.dashed, loops.has(l.id))}
+                    strokeLinecap={loops.has(l.id) ? 'round' : undefined}
                     markerEnd={l.inner ? undefined : `url(#${on ? 'arw-sel' : 'arw-' + Math.min(l.num, 6)})`}
                   />
-                  {loops.has(l.id) && l.points.length >= 2 && (() => {
-                    // Boucle : un seul ↺, au milieu de l'avant-dernier segment, décalé sur le côté opposé à
-                    // l'arrivée : la flèche reste visible (le trait rejoint souvent un autre trait).
-                    const n = l.points.length;
-                    // Trait droit : au milieu, au-dessus (ou à droite) du trait.
-                    const [a, b, c] = n >= 3 ? [l.points[n - 3], l.points[n - 2], l.points[n - 1]] : [l.points[0], l.points[1], [l.points[1][0] + 1, l.points[1][1] + 1] as Pt];
-                    const mx = (a[0] + b[0]) / 2;
-                    const my = (a[1] + b[1]) / 2;
-                    const vertical = Math.abs(a[0] - b[0]) < 0.5;
-                    const x = vertical ? mx - Math.sign(c[0] - b[0] || 1) * 10 : mx;
-                    const y = vertical ? my : my - Math.sign(c[1] - b[1] || 1) * 10;
-                    return (
-                      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ ...TAG_STYLE, font: '700 14px var(--font-tag)', fill: on ? 'var(--pid-select)' : 'var(--pid-text)', pointerEvents: 'none' }}>
-                        ↺
-                      </text>
-                    );
-                  })()}
                 </g>
               );
             })}
@@ -845,8 +836,9 @@ export function Canvas(props: Props) {
                   x2={b[0]}
                   y2={b[1]}
                   stroke={on ? 'var(--pid-select)' : outputColor(l.num)}
-                  strokeWidth={on || hoverLink === l.id ? 2.6 : l.dashed ? 1.6 : 2}
-                  strokeDasharray={l.dashed ? '5 5' : undefined}
+                  strokeWidth={on || hoverLink === l.id ? 2.6 : l.dashed ? 1.6 : loops.has(l.id) ? 2.4 : 2}
+                  strokeDasharray={lineDash(l.dashed, loops.has(l.id))}
+                  strokeLinecap={loops.has(l.id) ? 'round' : undefined}
                   markerEnd={`url(#${on ? 'arw-sel' : 'arw-' + Math.min(l.num, 6)})`}
                 />
               );
@@ -857,7 +849,7 @@ export function Canvas(props: Props) {
           <g>
             {routed.links.map((l) => {
               if (wire && wire.mode === 'retarget' && wire.linkId === l.id) return null;
-              const text = shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir);
+              const text = linkTag(l.link, loops.has(l.id));
               if (!text) return null;
               const ta = tags.get(l.id) ?? tagAnchor(l.points);
               const on = sel.link === l.id;
@@ -877,6 +869,15 @@ export function Canvas(props: Props) {
                   style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'pointer', fill: on ? 'var(--pid-select)' : TAG_STYLE.fill }}
                 >
                   {tagText(text)}
+                </text>
+              );
+            })}
+            {/* « AR » de la marche arrière : sur le trait pointillé, au milieu de son plus long segment. */}
+            {routed.links.filter((l) => l.dashed && !(wire && wire.mode === 'retarget' && wire.linkId === l.id)).map((l) => {
+              const m = arMark(l.points);
+              return (
+                <text key={'ar-' + l.id} x={m.x} y={m.y} textAnchor={m.anchor} dominantBaseline="central" style={{ ...TAG_STYLE, fill: sel.link === l.id ? 'var(--pid-select)' : TAG_STYLE.fill }}>
+                  AR
                 </text>
               );
             })}
@@ -1031,7 +1032,7 @@ export function Canvas(props: Props) {
                 onClick={() => n !== ref.num && props.commit(setOutputNum(pivot, ref, n))}
                 style={{ ...btn, background: n === ref.num ? 'var(--abi-green)' : 'var(--surface-nav)', color: '#fff' }}
               >
-                {tagFor(findEq(pivot, ref.eq)?.channels.length ?? 1, ref.ch, n, count, ref.dir)}
+                {tagFor(findEq(pivot, ref.eq)?.channels.length ?? 1, ref.ch, n, count, ref.dir, isSeparation(findEq(pivot, ref.eq)?.hg[0]?.type ?? ''))}
               </button>
             ))}
             <button
@@ -1187,7 +1188,7 @@ function Handles(props: {
     const lines: TipLine[] = ok
       ? [
           { text: tx(L.outTitle, num, dir === 'avant'), kind: 'title' },
-          { text: tx(L.outSub, polarity(num, outputsOf(eq, ch, dir).length + 1), ch, n > 1), kind: 'sub' },
+          { text: tx(L.outSub, polarity(num, outputsOf(eq, ch, dir).length + 1, isSeparation(eq.hg[0]?.type ?? '')), ch, n > 1), kind: 'sub' },
           { text: `${eq.repere || '?'}_CH${pad2(ch)} · S${num}`, kind: 'tech' },
           { text: tx(L.addClick), kind: 'hint' },
           { text: tx(L.addDrag), kind: 'hint' },

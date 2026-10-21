@@ -16,6 +16,7 @@ import {
 } from '../model/rules';
 import { Button, Field, Icon, inputStyle, SectionHead, Toggle } from '../ui/ui';
 import { Glyph } from './Palette';
+import { isSeparation } from '../model/symbols';
 
 // Textes de la fiche (français / anglais). Les noms TIA (08Aa_Main, 08Aa_CH01), codes HG, repères,
 // numéros de sortie (S1), unités et noms de consignes sont des données : jamais traduits.
@@ -369,7 +370,7 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
                                 <line x1={0} y1={4} x2={22} y2={4} stroke={outputColor(o.num)} strokeWidth={2} strokeDasharray={dir === 'arriere' ? '4 3' : undefined} />
                               </svg>
                               <span className="mono" style={{ width: 30, font: '600 12px var(--font-tag)' }}>{out}</span>
-                              <span style={{ width: 120, color: 'var(--text-secondary)' }}>{tx(dir === 'avant' ? L.forward : L.reverse)} · {polarity(o.num, outs.length)}</span>
+                              <span style={{ width: 120, color: 'var(--text-secondary)' }}>{tx(dir === 'avant' ? L.forward : L.reverse)} · {polarity(o.num, outs.length, isSeparation(eq.hg[0]?.type ?? ''))}</span>
                               {l ? (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <button type="button" onClick={() => onSelect(l.to.eq)} className="abi-link" title={tx(L.openTarget)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--abi-green)', font: '600 12px var(--font-tag)' }}>

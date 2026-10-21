@@ -24,7 +24,7 @@ const L = {
   outputs: { fr: 'Sorties', en: 'Outputs' },
   forwardLine: { fr: 'marche avant', en: 'forward' },
   reverseLine: { fr: 'marche arrière (AR)', en: 'reverse (AR)' },
-  tagMeaning: { fr: 'canal 1, sortie positive (− négative, ++ 2e positive ; 1.1, 1.2… dès 4 sorties)', en: 'channel 1, positive output (− negative, ++ 2nd positive; 1.1, 1.2… from 4 outputs)' },
+  tagMeaning: { fr: 'séparation : canal 1, sortie positive (− négative, ++ 2e positive) ; autres machines : 1, 2… (sorties principales)', en: 'separation: channel 1, positive output (− negative, ++ 2nd positive); other machines: 1, 2… (main outputs)' },
   pendingMeaning: { fr: 'sortie en attente : à raccorder ou supprimer', en: 'pending output: connect or remove it' },
   loopMeaning: { fr: 'boucle, retour en amont', en: 'loop, back upstream' },
   colorsTbc: { fr: 'couleurs à valider', en: 'colors to be confirmed' },
@@ -157,8 +157,9 @@ export function Legend() {
           {tx(L.tagMeaning)}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
-          <span style={{ width: 22, font: '600 10px var(--font-tag)', color: 'var(--pid-caption)', textAlign: 'center' }}>↺</span>
-          {tx(L.loopMeaning)}
+          {/* Retour de boucle : pointillé rond, ↺ au départ (comme « AR » pour la marche arrière). */}
+          <svg width={22} height={10} style={{ flex: 'none' }} aria-hidden="true"><line x1={2} y1={5} x2={20} y2={5} stroke="var(--pid-stroke-light)" strokeWidth={2.4} strokeLinecap="round" strokeDasharray="0.1 5" /></svg>
+          ↺ {tx(L.loopMeaning)}
         </span>
         <span style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minHeight: 16, lineHeight: '15px' }}>
           <svg width={22} height={10} style={{ flex: 'none', marginTop: 3 }} aria-hidden="true"><line x1={2} y1={5} x2={16} y2={5} stroke="var(--abi-orange-text)" strokeWidth={2.4} /><circle cx={17} cy={5} r={2.6} fill="var(--abi-orange-text)" /></svg>

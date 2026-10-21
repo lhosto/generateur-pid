@@ -9,7 +9,7 @@ import { straighten } from './straighten';
 import { boxAt, eqBox, sideOffset } from './geometry';
 import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum, takeOutput, updateEq, activeStandard, duplicateStandard, setStandardBase, setActiveStandard, deleteStandard } from './ops';
 import type { Pivot } from './pivot';
-import { loopLinks, routeAll, shortTag, tagFor } from './route';
+import { arMark, loopLinks, routeAll, shortTag, tagFor } from './route';
 import {
   canAddOutput, defaultStack, hgName, hsName, incompleteReasons, isFirstChannel, MAX, nextOutputNum, reverseBlocked, suggestRepere,
 } from './rules';
@@ -346,16 +346,23 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
     const e = findEq(a.p, a.id)!;
     expect(shortTag(e, 1, 1, 'avant')).toBe('');
-    expect(shortTag(e, 1, 1, 'arriere')).toBe('AR');
+    // Marche arrière : même étiquette qu'à l'avant (« AR » est écrit sur le trait).
+    expect(shortTag(e, 1, 1, 'arriere')).toBe('');
     const two = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }] }] };
-    expect(shortTag(two, 1, 1, 'avant')).toBe('−');
-    expect(shortTag(two, 1, 2, 'avant')).toBe('+');
+    // Convoyeur : sorties principales, simplement numérotées.
+    expect(shortTag(two, 1, 1, 'avant')).toBe('1');
+    expect(shortTag(two, 1, 2, 'avant')).toBe('2');
+    // Machine de séparation (trieur optique) : − / +.
+    const sep = { ...two, hg: [{ ...e.hg[0], type: 'OPSO' }] };
+    expect(shortTag(sep, 1, 1, 'avant')).toBe('−');
+    expect(shortTag(sep, 1, 2, 'avant')).toBe('+');
     const ch2 = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }] }, { outputs: [{ dir: 'avant' as const, num: 1 }] }] };
     expect(shortTag(ch2, 2, 1, 'avant')).toBe('2');
-    const mix = { ...e, channels: [two.channels[0], ch2.channels[1]] };
+    const mix = { ...sep, channels: [two.channels[0], ch2.channels[1]] };
     expect(shortTag(mix, 1, 2, 'avant')).toBe('1+');
+    expect(tagFor(2, 1, 2, 2, 'avant', false)).toBe('1.2');
     expect(tagFor(2, 1, 3, 3, 'avant')).toBe('1++');
-    expect(tagFor(1, 1, 3, 3, 'arriere')).toBe('++ AR');
+    expect(tagFor(1, 1, 3, 3, 'arriere')).toBe('++');
     // Dès 4 sorties, numérotation 1.1, 1.2… (même avec un seul canal).
     expect(tagFor(1, 1, 1, 4, 'avant')).toBe('1.1(−)');
     expect(tagFor(1, 1, 4, 4, 'avant')).toBe('1.4');
@@ -700,5 +707,11 @@ describe('arrivée droite sur un équipement collé', () => {
     const q = l.points;
     expect(q[q.length - 1][0]).toBe(q[q.length - 2][0]);
     expect(l.inner).toBeUndefined();
+  });
+});
+
+describe('« AR » sur le trait', () => {
+  it('au milieu du plus long segment, au-dessus d’un segment horizontal', () => {
+    expect(arMark([[0, 0], [0, 20], [100, 20], [100, 30]])).toEqual({ x: 50, y: 13, anchor: 'middle' });
   });
 });

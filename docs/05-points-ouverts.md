@@ -64,3 +64,7 @@
 | « + » de sortie | Même taille et même distance pour tous, symétriques d'un canal à l'autre | Décidé | 21/10/2026 |
 | Sorties sœurs | Jamais de croisement à moins de 28 px de l'équipement (zone des étiquettes) | Décidé | 21/10/2026 |
 | Boucle | Calculée par canal : boucle si la matière revient dans un canal où elle est déjà passée ; revenir dans un autre canal du même équipement n'en est pas une | Décidé | 21/10/2026 |
+| Retour de boucle (remplace le repère précédent) | Trait en pointillé rond (style A), ↺ dans l'étiquette de départ comme « AR » ; plus de gros ↺ au milieu du trait | Décidé | 21/10/2026 |
+| Familles du matériel générique | 5 familles : Convoyage, Séparation, Dosage, Broyage/divers, Stockage. Répartition PROVISOIRE (écluse rotative et alimentateur en Convoyage, ouvreuse de sac en Dosage, air / analyse / électrique en Broyage/divers) : à reprendre depuis une colonne de la liste HG | À fournir (liste HG) | 21/10/2026 |
+| Sorties − / + | Réservées aux machines de Séparation. Ailleurs (convoyeur…) toutes les sorties sont principales (deux tapis en sortie coupent le flux en deux) : numérotées 1, 2… (1.2 en multicanal), sans − / + ni « 1.4 » | Décidé | 21/10/2026 |
+| Étiquette marche arrière | Même étiquette qu'en marche avant (1, 2… ou − / +) ; « AR » écrit à part sur le trait pointillé, au milieu de son plus long segment | Décidé | 21/10/2026 |

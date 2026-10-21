@@ -4,7 +4,7 @@
 import { chAxis, chRoom, portUnit, eqBox, flowVec, isHorizontal, opposite, sideOffset, type Box } from './geometry';
 import type { Dir, Eq, Flow, Link, OutputRef, Pivot } from './pivot';
 import { outputLabel } from './rules';
-import { symbolOf } from './symbols';
+import { isSeparation, symbolOf } from './symbols';
 
 export type Pt = [number, number];
 
@@ -48,21 +48,43 @@ export const outputTag = (ch: number, num: number, dir: Dir) => `${ch}.${num}${d
  * - 2 ou 3 : signe de la sortie, S1 négative « − », S2 « + », S3 « ++ », précédé du canal s'il y en a
  *   plusieurs (1−, 1+, 1++) ;
  * - 4 et plus : numérotation « canal.sortie », la négative marquée (1.1(−), 1.2, 1.3, 1.4…).
- * « AR » s'ajoute en marche arrière.
+ * En marche arrière, l'étiquette est la même ; « AR » est posé sur le trait pointillé (arMark).
  */
-export function tagFor(nChannels: number, ch: number, num: number, count: number, dir: Dir): string {
-  const ar = dir === 'arriere' ? 'AR' : '';
+export function tagFor(nChannels: number, ch: number, num: number, count: number, dir: Dir, separation = true): string {
+  // Marche arrière : même étiquette qu'à l'avant ; « AR » est écrit sur le trait (voir arMark).
+  void dir;
+  const ar = '';
   const chPart = nChannels > 1 ? `${ch}` : '';
+  // Hors séparation : sorties principales, numérotées simplement (2, 3… ; 1.2 en multicanal), sans − / +.
+  if (!separation) return [count <= 1 ? chPart : nChannels > 1 ? `${ch}.${num}` : `${num}`, ar].filter(Boolean).join(' ');
   // Dès 4 sorties : 1.1(−) pour la négative, 1.2, 1.3… pour les autres.
   const core = count >= 4 ? `${ch}.${num}${num === 1 ? '(−)' : ''}` : count <= 1 ? chPart : chPart + (num === 1 ? '−' : '+'.repeat(num - 1));
   return [core, ar].filter(Boolean).join(' ');
 }
 
 /** Étiquette d'une sortie d'un équipement (voir tagFor). */
+/**
+ * Où écrire « AR » sur un trait de marche arrière : au milieu de son plus long segment, décalé de 7 px
+ * (au-dessus d'un segment horizontal, à droite d'un vertical), loin des étiquettes de départ.
+ */
+export function arMark(points: Pt[]): { x: number; y: number; anchor: 'start' | 'middle' } {
+  let best = 1;
+  let len = -1;
+  for (let i = 1; i < points.length; i++) {
+    const d = Math.abs(points[i][0] - points[i - 1][0]) + Math.abs(points[i][1] - points[i - 1][1]);
+    if (d > len) (len = d), (best = i);
+  }
+  const [a, b] = [points[best - 1], points[best]];
+  const vertical = Math.abs(a[0] - b[0]) < 0.5;
+  const mx = (a[0] + b[0]) / 2;
+  const my = (a[1] + b[1]) / 2;
+  return vertical ? { x: mx + 5, y: my, anchor: 'start' } : { x: mx, y: my - 7, anchor: 'middle' };
+}
+
 export function shortTag(eq: Eq | undefined, ch: number, num: number, dir: Dir): string {
   if (!eq) return outputTag(ch, num, dir);
   const count = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir).length;
-  return tagFor(eq.channels.length, ch, num, count, dir);
+  return tagFor(eq.channels.length, ch, num, count, dir, isSeparation(eq.hg[0]?.type ?? ''));
 }
 
 export interface TagPos {

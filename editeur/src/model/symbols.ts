@@ -77,71 +77,67 @@ export const SYMBOLS: Record<string, SymbolSpec> = {
   BYPA: { base: 'diamond', group: 'Convoyage' },
   ROVA: { base: 'card', picto: P.star, group: 'Convoyage' },
   BINT: { base: 'card', picto: P.tipper, group: 'Convoyage' },
-  OPSO: { base: 'card', picto: P.eye, group: 'Tri et séparation' },
-  EDCU: { base: 'card', picto: P.ticks, group: 'Tri et séparation' },
-  FIEX: { base: 'card', picto: P.waves, group: 'Tri et séparation' },
-  ROUS: { base: 'card', picto: P.rolls, group: 'Tri et séparation' },
-  ROBO: { base: 'card', picto: P.robot, group: 'Tri et séparation' },
-  CAB: { base: 'card', picto: P.person, group: 'Tri et séparation' },
-  BS: { base: 'screen', group: 'Criblage' },
-  SCVI: { base: 'screen', picto: P.zigzag, group: 'Criblage' },
-  SCDI: { base: 'grid', group: 'Criblage' },
-  SCD3: { base: 'grid', picto: 'M4 0v12M8 0v12', group: 'Criblage' },
-  TROM: { base: 'card', picto: P.drum, group: 'Criblage' },
-  OVPM: { base: 'diamond', picto: P.magnet, group: 'Magnétique' },
-  OVCA: { base: 'diamond', picto: P.magnetBar, group: 'Magnétique' },
-  MAGP: { base: 'circle', picto: P.magnet, group: 'Magnétique' },
-  DOBO: { base: 'para', group: 'Ouverture, broyage, presses' },
-  SHRE: { base: 'card', picto: P.teeth, group: 'Ouverture, broyage, presses' },
-  GRAN: { base: 'card', picto: P.dots, group: 'Ouverture, broyage, presses' },
-  COMP: { base: 'card', picto: P.ram, group: 'Ouverture, broyage, presses' },
-  PRBA: { base: 'card', picto: P.bale, group: 'Ouverture, broyage, presses' },
-  PRPA: { base: 'card', picto: P.cube, group: 'Ouverture, broyage, presses' },
-  PRBR: { base: 'card', picto: P.bricks, group: 'Ouverture, broyage, presses' },
-  WRAP: { base: 'card', picto: P.spiral, group: 'Ouverture, broyage, presses' },
-  DOBU: { base: 'hopper', group: 'Stockage et dosage' },
-  S: { base: 'silo', group: 'Stockage et dosage' },
-  SWSD: { base: 'silo', picto: P.weight, group: 'Stockage et dosage' },
-  FAN: { base: 'circle', picto: P.fan, group: 'Air et dépoussiérage' },
-  CTA: { base: 'card', picto: P.fan, group: 'Air et dépoussiérage' },
-  DESA: { base: 'card', picto: P.bags, group: 'Air et dépoussiérage' },
-  DECO: { base: 'card', picto: P.burst, group: 'Air et dépoussiérage' },
-  SMFI: { base: 'card', picto: P.smart, group: 'Air et dépoussiérage' },
-  PLEN: { base: 'card', picto: P.plenum, group: 'Air et dépoussiérage' },
-  AIRC: { base: 'circle', picto: P.compressor, group: 'Air et dépoussiérage' },
-  ACD: { base: 'circle', picto: P.drop, group: 'Air et dépoussiérage' },
-  DRYA: { base: 'circle', picto: P.dropX, group: 'Air et dépoussiérage' },
-  DRYR: { base: 'circle', picto: P.snow, group: 'Air et dépoussiérage' },
-  MIST: { base: 'circle', picto: P.mist, group: 'Air et dépoussiérage' },
-  OPCI: { base: 'card', picto: P.eyeFlame, group: 'Analyse' },
-  PCI: { base: 'card', picto: P.flame, group: 'Analyse' },
-  C: { base: 'cabinet', picto: P.door, group: 'Électrique et commande' },
-  P: { base: 'desk', group: 'Électrique et commande' },
-  REMO: { base: 'card', picto: P.remote, group: 'Électrique et commande' },
-  CYL: { base: 'card', picto: P.cylinder, group: 'Électrique et commande' },
+  OPSO: { base: 'card', picto: P.eye, group: 'Séparation' },
+  EDCU: { base: 'card', picto: P.ticks, group: 'Séparation' },
+  FIEX: { base: 'card', picto: P.waves, group: 'Séparation' },
+  ROUS: { base: 'card', picto: P.rolls, group: 'Séparation' },
+  ROBO: { base: 'card', picto: P.robot, group: 'Séparation' },
+  CAB: { base: 'card', picto: P.person, group: 'Séparation' },
+  BS: { base: 'screen', group: 'Séparation' },
+  SCVI: { base: 'screen', picto: P.zigzag, group: 'Séparation' },
+  SCDI: { base: 'grid', group: 'Séparation' },
+  SCD3: { base: 'grid', picto: 'M4 0v12M8 0v12', group: 'Séparation' },
+  TROM: { base: 'card', picto: P.drum, group: 'Séparation' },
+  OVPM: { base: 'diamond', picto: P.magnet, group: 'Séparation' },
+  OVCA: { base: 'diamond', picto: P.magnetBar, group: 'Séparation' },
+  MAGP: { base: 'circle', picto: P.magnet, group: 'Séparation' },
+  DOBO: { base: 'para', group: 'Dosage' },
+  SHRE: { base: 'card', picto: P.teeth, group: 'Broyage/divers' },
+  GRAN: { base: 'card', picto: P.dots, group: 'Broyage/divers' },
+  COMP: { base: 'card', picto: P.ram, group: 'Broyage/divers' },
+  PRBA: { base: 'card', picto: P.bale, group: 'Broyage/divers' },
+  PRPA: { base: 'card', picto: P.cube, group: 'Broyage/divers' },
+  PRBR: { base: 'card', picto: P.bricks, group: 'Broyage/divers' },
+  WRAP: { base: 'card', picto: P.spiral, group: 'Broyage/divers' },
+  DOBU: { base: 'hopper', group: 'Dosage' },
+  S: { base: 'silo', group: 'Stockage' },
+  SWSD: { base: 'silo', picto: P.weight, group: 'Stockage' },
+  FAN: { base: 'circle', picto: P.fan, group: 'Broyage/divers' },
+  CTA: { base: 'card', picto: P.fan, group: 'Broyage/divers' },
+  DESA: { base: 'card', picto: P.bags, group: 'Broyage/divers' },
+  DECO: { base: 'card', picto: P.burst, group: 'Broyage/divers' },
+  SMFI: { base: 'card', picto: P.smart, group: 'Broyage/divers' },
+  PLEN: { base: 'card', picto: P.plenum, group: 'Broyage/divers' },
+  AIRC: { base: 'circle', picto: P.compressor, group: 'Broyage/divers' },
+  ACD: { base: 'circle', picto: P.drop, group: 'Broyage/divers' },
+  DRYA: { base: 'circle', picto: P.dropX, group: 'Broyage/divers' },
+  DRYR: { base: 'circle', picto: P.snow, group: 'Broyage/divers' },
+  MIST: { base: 'circle', picto: P.mist, group: 'Broyage/divers' },
+  OPCI: { base: 'card', picto: P.eyeFlame, group: 'Broyage/divers' },
+  PCI: { base: 'card', picto: P.flame, group: 'Broyage/divers' },
+  C: { base: 'cabinet', picto: P.door, group: 'Broyage/divers' },
+  P: { base: 'desk', group: 'Broyage/divers' },
+  REMO: { base: 'card', picto: P.remote, group: 'Broyage/divers' },
+  CYL: { base: 'card', picto: P.cylinder, group: 'Broyage/divers' },
 };
 
-/** Ordre des groupes : les noms français servent de clés (SymbolSpec.group), l'affichage passe par GROUP_LABELS. */
-export const GROUP_ORDER = [
-  'Convoyage', 'Tri et séparation', 'Criblage', 'Magnétique', 'Ouverture, broyage, presses',
-  'Stockage et dosage', 'Air et dépoussiérage', 'Analyse', 'Électrique et commande', 'Sans symbole',
-];
+/**
+ * Familles générales du matériel générique (PROVISOIRE : viendront de la liste HG). Les noms français
+ * servent de clés (SymbolSpec.group), l'affichage passe par GROUP_LABELS. Seule la Séparation a des
+ * sorties négative / positives (− / +) ; ailleurs toutes les sorties sont principales.
+ */
+export const GROUP_ORDER = ['Convoyage', 'Séparation', 'Dosage', 'Broyage/divers', 'Stockage', 'Sans symbole'];
 
-/** Libellé affiché de chaque groupe (français / anglais). */
+/** Libellé affiché de chaque famille (français / anglais). */
 export const GROUP_LABELS: Record<string, Entry> = {
   'Convoyage': { fr: 'Convoyage', en: 'Conveying' },
-  'Tri et séparation': { fr: 'Tri et séparation', en: 'Sorting and separation' },
-  'Criblage': { fr: 'Criblage', en: 'Screening' },
-  'Magnétique': { fr: 'Magnétique', en: 'Magnetic' },
-  'Ouverture, broyage, presses': { fr: 'Ouverture, broyage, presses', en: 'Bag opening, shredding, presses' },
-  'Stockage et dosage': { fr: 'Stockage et dosage', en: 'Storage and dosing' },
-  'Air et dépoussiérage': { fr: 'Air et dépoussiérage', en: 'Air and dust extraction' },
-  'Analyse': { fr: 'Analyse', en: 'Analysis' },
-  'Électrique et commande': { fr: 'Électrique et commande', en: 'Electrical and control' },
+  'Séparation': { fr: 'Séparation', en: 'Separation' },
+  'Dosage': { fr: 'Dosage', en: 'Dosing' },
+  'Broyage/divers': { fr: 'Broyage / divers', en: 'Shredding / misc.' },
+  'Stockage': { fr: 'Stockage', en: 'Storage' },
   'Sans symbole': { fr: 'Sans symbole', en: 'No symbol' },
 };
 
-/** Nom affiché d'un groupe dans la langue courante (la clé elle-même si elle n'est pas traduite). */
 export const groupLabel = (g: string) => (GROUP_LABELS[g] ? tx(GROUP_LABELS[g]) : g);
 
 /** HG principal sans visuel défini : forme neutre, signalée « symbole à définir ». */
@@ -176,3 +172,6 @@ export const symbolOf = (hg0: string): SymbolSpec => {
   const b = active[hg0];
   return b ? { ...s, base: b } : s;
 };
+
+/** Machine de séparation : ses sorties ont un sens (négative − / positives +). */
+export const isSeparation = (hg0: string) => symbolOf(hg0).group === 'Séparation';

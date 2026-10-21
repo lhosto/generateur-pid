@@ -4,6 +4,7 @@ import { getLang, tx } from '../i18n';
 import type { BaseSettings, Catalogue, EqOptionDef, HgTypeDef, HsDef } from './catalogue';
 import { hg0Of } from './geometry';
 import { uid, type Dir, type Eq, type Hg, type Pivot, type Setpoint } from './pivot';
+import { isSeparation } from './symbols';
 
 export const MAX = { channels: 3, outputs: 6, setpoints: 4, hg: 23 };
 
@@ -158,15 +159,17 @@ export function canAddOutput(eq: Eq, ch: number, dir: Dir): boolean {
 export const canAddChannel = (eq: Eq) => eq.channels.length < MAX.channels;
 
 /**
- * Type d'une sortie. Seule sortie du canal dans ce sens : « principale » (pas de négative / positive
- * tant qu'il n'y a pas de choix). Sinon S1 = négative, les suivantes = positives.
+ * Type d'une sortie. Hors machine de séparation (convoyeur…) : toujours « principale » (deux sorties
+ * coupent le flux en deux). Séparation : seule sortie → « principale » ; sinon S1 = négative, les
+ * suivantes = positives.
  */
-export const polarity = (num: number, count = 2) => tx(count <= 1 ? L.main : num === 1 ? L.negative : L.positive);
+export const polarity = (num: number, count = 2, separation = true) =>
+  tx(count <= 1 || !separation ? L.main : num === 1 ? L.negative : L.positive);
 export const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** Étiquette d'une sortie : repère · CH01 · S1 · sens · polarité (CH01 et S1 sont des noms, non traduits). */
 export function outputLabel(eq: Eq, ch: number, dir: Dir, num: number): string {
-  return `${eq.repere || '?'} · CH${pad2(ch)} · S${num} · ${tx(dir === 'avant' ? L.forward : L.reverse)} · ${polarity(num, outputsOf(eq, ch, dir).length)}`;
+  return `${eq.repere || '?'} · CH${pad2(ch)} · S${num} · ${tx(dir === 'avant' ? L.forward : L.reverse)} · ${polarity(num, outputsOf(eq, ch, dir).length, isSeparation(eq.hg[0]?.type ?? ''))}`;
 }
 
 /** First channel : coché automatiquement si aucune sortie n'arrive dans le canal. */
