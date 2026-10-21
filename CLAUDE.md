@@ -114,7 +114,7 @@ Ordre d'appel des FC EQ dans l'OB ; comportement sur plantage technique ; option
 
 ## Backlog (hors V1)
 
-Vue de montage des FU et smart régulations ; réorganisation automatique du diagramme ; export Visio ; connecteur SharePoint/Graph ; import des 3 anciens sites faits à la main (« prise en charge », pas sûr d'être développé) ; double repère client/Aktid étendu ; agent IA d'aide à la programmation (vision long terme).
+Vue de montage des FU et smart régulations ; **documents de la phase REA produits par l'éditeur** (matrice de sécurité et bilan électrique vers le portail instrumentations contrôle commande, AF, schéma électrique, organigramme réseau, listing machine ABI, liste des adresses IP, manuel utilisateur) ; réorganisation automatique du diagramme ; export Visio ; connecteur SharePoint/Graph ; import des 3 anciens sites faits à la main (« prise en charge », pas sûr d'être développé) ; double repère client/Aktid étendu ; agent IA d'aide à la programmation (vision long terme).
 
 ## Fichiers
 

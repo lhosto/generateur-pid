@@ -372,6 +372,16 @@ Les grandes décisions sont prises ; il reste des points de détail à trancher 
 
 Backlog, hors V1 :
 
+- Documents de la phase REA produits par l'éditeur, à terme tous (noté par Alex le 21/10/2026) :
+  - matrice de sécurité, publiée sur le portail instrumentations contrôle commande ;
+  - bilan électrique, publié sur le portail instrumentations contrôle commande ;
+  - AF (analyse fonctionnelle) ;
+  - schéma électrique ;
+  - organigramme réseau ;
+  - listing machine (ABI) ;
+  - liste des adresses IP ;
+  - manuel utilisateur.
+
 - Vue de montage des FU : une feuille par régulation, blocs PID, combiné, forçages, cascade et parallèle, entrées choisies dans les échanges SCADA des HG.
 
 - Réorganisation automatique du diagramme.

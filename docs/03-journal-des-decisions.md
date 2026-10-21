@@ -86,3 +86,14 @@ Décisions prises par Alex (ALH) au fil de trois sessions avec Claude, dans l'or
 - Validation safety humaine obligatoire avant génération.
 - Adressage : listing SharePoint des plages IP et %I/%Q par type de HG ; attribution + contrôle des recouvrements et réserves.
 - Livrables : dossier business + cahier des charges technique (rédigés le 19/10, Word au thème Aktid le 19/10 après-midi).
+
+## Session du 21 octobre 2026 — retours sur la maquette de l'éditeur
+
+- Forme d'un EQ = HG principal posé en HG0 (liste HG, case « HG Principal ») ; chaque HG principal a un visuel distinct.
+- Textes pour l'opérateur en français simple, terme technique en petit (Équipement EQ, Canal CH, Matériel générique HG, Matériel spécifique HS, Fonction FU) ; anglais préparé.
+- Canaux : « + / − » regroupés dans un onglet posé sur l'équipement au survol, pour ne pas les confondre avec les sorties.
+- « + » d'une sortie : petit menu, convoyeur par défaut, « autre » ouvre le choix de l'équipement.
+- Les formes allongées suivent le sens du flux (un tapis qui descend est vertical).
+- Infobulles compréhensibles par un non-technicien.
+- Doublons contrôlés sur le repère client et sur le repère Aktid.
+- Backlog : à terme, l'éditeur produit tous les documents de la phase REA. Il s'agit de la matrice de sécurité et du bilan électrique (vers le portail instrumentations contrôle commande), de l'AF, du schéma électrique, de l'organigramme réseau, du listing machine (ABI), de la liste des adresses IP et du manuel utilisateur.
