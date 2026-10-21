@@ -4,8 +4,11 @@
 // PROVISOIRE : ronds → convoyeur, overband à aimant → OVPM, « L » à sorties −/+ → trieur optique,
 // losange → BYPA, colonnes colorées → cabine de tri, trémie → DOBU, broyeur → SHRE, bennes B0xx → silo.
 // Les sorties vers les bacs (BS) et les petits bacs de cabine ne sont pas reprises (sorties en attente).
+// Overbands accolés à leur convoyeur (joint, sans trait).
 import type { Catalogue } from '../model/catalogue';
-import { addEq, connect, emptyPivot, takeOutput, updateEq } from '../model/ops';
+import { addEq, connect, emptyPivot, findEq, setPositions, takeOutput, updateEq } from '../model/ops';
+import { dockOnDrop } from '../model/dock';
+import { eqBox } from '../model/geometry';
 import type { Dir, Flow, Pivot } from '../model/pivot';
 
 const X = (x: number) => 40 + x * 1.45;
@@ -184,5 +187,20 @@ export function siteLigneA(cat: Catalogue): Pivot {
   ln('630', '640');
   ln('631L', '640');
   ln('640', '650');
+  // Overbands posés sur leur convoyeur (accolés, sans trait) : on les lâche contre le tapis.
+  const dock = (mach: string, conv: string) => {
+    const c = findEq(p, id[conv])!;
+    const cb = eqBox(c);
+    const m = findEq(p, id[mach])!;
+    const mb = eqBox(m);
+    const horizontal = c.flow === 'E' || c.flow === 'W';
+    const at = horizontal ? { x: c.x, y: (m.y < c.y ? cb.y0 - mb.h / 2 : cb.y1 + mb.h / 2) } : { x: m.x > c.x ? cb.x1 + mb.w / 2 : cb.x0 - mb.w / 2, y: c.y };
+    p = dockOnDrop(setPositions(p, { [id[mach]]: at }), id[mach]);
+  };
+  dock('050', '040');
+  dock('120', '110');
+  dock('350', '340');
+  dock('540', '530');
+  dock('620', '610');
   return p;
 }

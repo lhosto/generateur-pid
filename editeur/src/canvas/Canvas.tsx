@@ -20,6 +20,7 @@ import { Glyph } from '../panels/Palette';
 import { EqNode } from './EqNode';
 import { ChuteShape, labelPos } from './symbols';
 import { isSeparation } from '../model/symbols';
+import { dockedOn, dockOnDrop } from '../model/dock';
 
 export interface Selection {
   eqs: string[];
@@ -243,6 +244,17 @@ export function Canvas(props: Props) {
   const lang = getLang();
   const routed = useMemo(() => routeAll(pivot), [pivot, lang]);
   const loops = useMemo(() => loopLinks(pivot), [pivot.links, pivot.equipments]);
+  // Machines accolées au-dessus d'un convoyeur : leur repère passe au-dessus (le dessous touche le tapis).
+  const labelAbove = useMemo(() => {
+    const out = new Set<string>();
+    for (const l of routed.links) {
+      if (!l.docked) continue;
+      const m = boxes.get(l.link.to.eq);
+      const c = boxes.get(l.link.from.eq);
+      if (m && c && m.y1 <= c.y0 + 2) out.add(l.link.to.eq);
+    }
+    return out;
+  }, [routed, boxes]);
   // Étiquette d'un lien : repère de sortie, puis ↺ pour un retour de boucle (comme « AR » pour la marche arrière).
   const linkTag = (lk: Pivot['links'][number], loop: boolean) =>
     [shortTag(findEq(pivot, lk.from.eq), lk.from.ch, lk.from.num, lk.from.dir), loop ? '↺' : ''].filter(Boolean).join(' ');
@@ -406,11 +418,13 @@ export function Canvas(props: Props) {
     const pv = live.current.pivot;
     const item = kind === 'eq' ? findEq(pv, id) : pv.chutes.find((c) => c.id === id);
     if (!item) return;
+    // Les machines accolées (overband, poulie) suivent leur convoyeur.
+    const carried = next.eqs.flatMap((eqId) => dockedOn(pv, eqId)).filter((x) => !next.eqs.includes(x));
     drag.current = {
       kind: 'move',
       start: pv,
       a: toWorld(e.clientX, e.clientY),
-      eqs: next.eqs,
+      eqs: [...next.eqs, ...carried],
       chutes: next.chutes,
       primary: [item.x, item.y],
       primaryId: kind === 'eq' ? id : null,
@@ -524,7 +538,12 @@ export function Canvas(props: Props) {
       return;
     }
     if (d.kind === 'move') {
-      if (d.moved) commit(pv, d.start);
+      if (d.moved) {
+        // Overband / poulie lâché près d'un convoyeur : il s'y accole (et le lien se crée).
+        let q = pv;
+        for (const eqId of d.eqs) q = dockOnDrop(q, eqId);
+        commit(q, d.start);
+      }
       else if (d.clicked) props.setSel({ ...EMPTY_SEL, eqs: findEq(pv, d.clicked) ? [d.clicked] : [], chutes: findEq(pv, d.clicked) ? [] : [d.clicked] });
       return;
     }
@@ -607,7 +626,7 @@ export function Canvas(props: Props) {
     if (hg0) {
       const last = pv.equipments[pv.equipments.length - 1];
       const r = addEq(cat, pv, hg0, p[0], p[1], { zone: last ? zoneOf(last.repere) : undefined });
-      props.commit(r.p);
+      props.commit(dockOnDrop(r.p, r.id));
       props.setSel({ ...EMPTY_SEL, eqs: [r.id] });
     } else if (isChute) {
       const r = addChute(pv, p[0], p[1]);
@@ -750,6 +769,7 @@ export function Canvas(props: Props) {
               const on = sel.link === l.id;
               const hot = hoverLink === l.id;
               const pts = l.points.map((q) => q.join(',')).join(' ');
+              if (l.docked) return null; // joint dessiné par-dessus les équipements (plus bas)
               return (
                 <g
                   key={l.id}
@@ -820,6 +840,7 @@ export function Canvas(props: Props) {
               fault={props.faults.has(eq.id)}
               onDown={onEqDown}
               onHover={setHoverDelayed}
+              labelAbove={labelAbove.has(eq.id)}
             />
           ))}
 
@@ -845,10 +866,38 @@ export function Canvas(props: Props) {
             })}
           </g>
 
+          {/* Joints des machines accolées (overband, poulie) : par-dessus les formes, cliquables. */}
+          <g>
+            {routed.links.filter((l) => l.docked).map((l) => {
+              const on = sel.link === l.id;
+              const hot = hoverLink === l.id;
+              const { x, y, vertical } = l.docked!;
+                // Machine accolée au convoyeur : un joint plein au contact, cliquable (sélectionne le lien).
+                const [w, h] = vertical ? [6, 14] : [14, 6];
+                return (
+                  <g
+                    key={l.id}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      if (e.button === 1 || space.current) return startPan(e);
+                      props.setSel({ ...EMPTY_SEL, link: l.id });
+                      setTip(null);
+                    }}
+                    onPointerEnter={(e) => { setHoverLink(l.id); if (sel.link !== l.id) pointerTip(e, linkTip(l.link)); }}
+                    onPointerLeave={() => { setHoverLink(null); setTip(null); }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <rect x={x - w / 2 - 4} y={y - h / 2 - 4} width={w + 8} height={h + 8} fill="transparent" />
+                    <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={1.5} fill={on ? 'var(--pid-select)' : hot ? '#fff' : 'var(--pid-stroke-light)'} />
+                  </g>
+                );
+            })}
+          </g>
           {/* Étiquettes des sorties : par-dessus tous les traits (jamais cachées derrière une flèche). Clic = sélectionner le trait. */}
           <g>
             {routed.links.map((l) => {
               if (wire && wire.mode === 'retarget' && wire.linkId === l.id) return null;
+              if (l.docked) return null;
               const text = linkTag(l.link, loops.has(l.id));
               if (!text) return null;
               const ta = tags.get(l.id) ?? tagAnchor(l.points);

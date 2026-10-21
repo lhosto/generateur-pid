@@ -5,6 +5,7 @@ import { chAxis, chRoom, portUnit, eqBox, flowVec, isHorizontal, opposite, sideO
 import type { Dir, Eq, Flow, Link, OutputRef, Pivot } from './pivot';
 import { outputLabel } from './rules';
 import { isSeparation, symbolOf } from './symbols';
+import { contact, dockedLinks } from './dock';
 
 export type Pt = [number, number];
 
@@ -18,6 +19,8 @@ export interface RoutedLink {
    * du canal visé. Dessinée par-dessus les équipements.
    */
   inner?: [Pt, Pt];
+  /** Lien accolé (overband, poulie posés sur le convoyeur) : pas de trait, un joint au point de contact. */
+  docked?: { x: number; y: number; vertical: boolean };
   num: number;
   dashed: boolean;
   label: string;
@@ -548,8 +551,11 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
   // Chaque sortie reliée a son propre point de départ : la plus petite (S1) sur l'axe du canal, les
   // suivantes décalées de part et d'autre. Aucun tronc commun : on voit d'où part chaque trait.
   const ports = new Map<string, number>();
+  // Liens accolés (machine posée sur le convoyeur) : ni tracé ni port de départ, seulement un joint.
+  const docked = dockedLinks(p);
   const groups = new Map<string, Link[]>();
   for (const l of p.links) {
+    if (docked.has(l.id)) continue;
     const k = `${l.from.eq}|${l.from.ch}|${l.from.dir}`;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k)!.push(l);
@@ -562,7 +568,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
     for (const l of g) ports.set(l.id, portOffset(e, boxes.get(e.id)!, l.from.ch, l.from.dir, l.from.num));
   }
 
-  const valid = p.links.filter((l) => eqs.has(l.from.eq) && eqs.has(l.to.eq));
+  const valid = p.links.filter((l) => eqs.has(l.from.eq) && eqs.has(l.to.eq) && !docked.has(l.id));
   // Départ droit : plus long sous des étiquettes posées sur le trait (départ horizontal) ; à côté d'un
   // trait vertical, l'étiquette ne demande que sa hauteur.
   const labelRun = (src: Eq, l: Link) =>
@@ -640,6 +646,25 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
       label: `${outputLabel(src, l.from.ch, l.from.dir, l.from.num)}  →  ${dst.repere || '?'} · CH${String(l.to.ch).padStart(2, '0')}`,
     });
   });
+  for (const l of p.links) {
+    if (!docked.has(l.id)) continue;
+    const src = eqs.get(l.from.eq)!;
+    const dst = eqs.get(l.to.eq)!;
+    const c = contact(boxes.get(src.id)!, boxes.get(dst.id)!);
+    // Plusieurs canaux : un joint par canal, côte à côte le long du contact.
+    const k = (l.from.ch - (src.channels.length + 1) / 2) * 16;
+    if (c.vertical) c.y += k;
+    else c.x += k;
+    links.push({
+      id: l.id,
+      link: l,
+      points: [[c.x, c.y], [c.x, c.y]],
+      docked: c,
+      num: l.from.num,
+      dashed: false,
+      label: `${outputLabel(src, l.from.ch, l.from.dir, l.from.num)}  →  ${dst.repere || '?'} · CH${String(l.to.ch).padStart(2, '0')}`,
+    });
+  }
 
   // Sorties libres : petit trait sur l'axe du canal, côté flux (avant) ou côté opposé (arrière),
   // légèrement écartées entre elles pour rester saisissables.
