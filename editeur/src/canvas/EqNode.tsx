@@ -1,6 +1,6 @@
 // Un équipement sur le PID : forme du HG0, repère, cadres d'état d'édition.
 import { memo } from 'react';
-import { eqBox, hg0Of } from '../model/geometry';
+import { chCuts, eqBox, hg0Of } from '../model/geometry';
 import type { Eq } from '../model/pivot';
 import { haloOf, labelPos, Shape, Tag } from './symbols';
 
@@ -31,7 +31,7 @@ export const EqNode = memo(function EqNode({ eq, selected, incomplete, fault, on
       {incomplete && !fault && (
         <rect x={box.x0 - (selected ? 8 : 4)} y={box.y0 - (selected ? 8 : 4)} width={w + (selected ? 16 : 8)} height={h + (selected ? 16 : 8)} rx={7} fill="none" stroke="var(--pid-warn)" strokeWidth={1.2} strokeDasharray="4 3" />
       )}
-      <Shape hg0={hg0} box={box} flow={eq.flow} channels={eq.channels.length} fault={fault} />
+      <Shape hg0={hg0} box={box} flow={eq.flow} channels={eq.channels.length} fault={fault} cuts={chCuts(eq)} />
       <Tag text={eq.repere || '?'} x={lp.x} y={lp.y} outside={lp.outside} halo={haloOf(hg0, fault)} />
     </g>
   );

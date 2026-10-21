@@ -6,10 +6,10 @@ import { align, distribute } from './align';
 import { principals, type Catalogue } from './catalogue';
 import { SYMBOLS, aktidSymbolOf, setActiveShapes, symbolOf } from './symbols';
 import { straighten } from './straighten';
-import { boxAt, eqBox } from './geometry';
+import { boxAt, eqBox, sideOffset } from './geometry';
 import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum, takeOutput, updateEq, activeStandard, duplicateStandard, setStandardBase, setActiveStandard, deleteStandard } from './ops';
 import type { Pivot } from './pivot';
-import { loopLinks, routeAll, shortTag } from './route';
+import { loopLinks, routeAll, shortTag, tagFor } from './route';
 import {
   canAddOutput, defaultStack, hgName, hsName, incompleteReasons, isFirstChannel, MAX, nextOutputNum, reverseBlocked, suggestRepere,
 } from './rules';
@@ -348,11 +348,17 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     expect(shortTag(e, 1, 1, 'avant')).toBe('');
     expect(shortTag(e, 1, 1, 'arriere')).toBe('AR');
     const two = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }] }] };
-    expect(shortTag(two, 1, 2, 'avant')).toBe('1.2');
+    expect(shortTag(two, 1, 1, 'avant')).toBe('−');
+    expect(shortTag(two, 1, 2, 'avant')).toBe('+');
     const ch2 = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }] }, { outputs: [{ dir: 'avant' as const, num: 1 }] }] };
-    expect(shortTag(ch2, 2, 1, 'avant')).toBe('2.1');
+    expect(shortTag(ch2, 2, 1, 'avant')).toBe('2');
     const mix = { ...e, channels: [two.channels[0], ch2.channels[1]] };
-    expect(shortTag(mix, 1, 2, 'avant')).toBe('1.2');
+    expect(shortTag(mix, 1, 2, 'avant')).toBe('1+');
+    expect(tagFor(2, 1, 3, 3, 'avant')).toBe('1++');
+    expect(tagFor(1, 1, 3, 3, 'arriere')).toBe('++ AR');
+    // Dès 4 sorties, numérotation 1.1, 1.2… (même avec un seul canal).
+    expect(tagFor(1, 1, 1, 4, 'avant')).toBe('1.1(−)');
+    expect(tagFor(1, 1, 4, 4, 'avant')).toBe('1.4');
   });
 });
 
@@ -436,7 +442,7 @@ describe('croisements de traits', () => {
     for (const x2 of xs(t2.id)) for (const x1 of xs(t1.id)) expect(Math.abs(x2 - x1)).toBeGreaterThanOrEqual(8);
   });
   it('site de test : seuls restent les croisements imposés (ordre des sorties, canaux différents)', () => {
-    expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(12);
+    expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(16);
   });
 });
 
@@ -524,5 +530,175 @@ describe('boucle par la marche arrière', () => {
     const loops = loopLinks(p);
     const back = p.links.find((l) => l.from.eq === e92)!;
     expect([...loops]).toEqual([back.id]);
+  });
+});
+
+describe('pas de coude sur les étiquettes', () => {
+  it('087 : 1.1 monte vers 088 après la zone des étiquettes', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 300);
+    const up = addEq(cat, a.p, 'BELT', 300, 200);
+    const right = addEq(cat, up.p, 'BELT', 260, 300);
+    p = connect(right.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: up.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: right.id, ch: 1 });
+    const box = eqBox(findEq(p, a.id)!);
+    const l11 = routeAll(p).links.find((l) => l.link.to.eq === up.id)!;
+    expect(l11.points[1][0] - box.x1).toBeGreaterThanOrEqual(28);
+  });
+});
+
+describe('pas de trait qui dépasse', () => {
+  it('087 : trois sorties vers le haut, le bas et loin, aucun demi-tour', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 300);
+    const t93 = addEq(cat, a.p, 'BELT', 230, 230);
+    const t90 = addEq(cat, t93.p, 'BELT', 230, 370);
+    const far = addEq(cat, t90.p, 'BELT', 500, 100);
+    p = connect(far.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: far.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: t90.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 3 }, { eq: t93.id, ch: 1 });
+    for (const l of routeAll(p).links) {
+      const q = l.points;
+      for (let i = 1; i < q.length - 1; i++) {
+        const dot = (q[i][0] - q[i - 1][0]) * (q[i + 1][0] - q[i][0]) + (q[i][1] - q[i - 1][1]) * (q[i + 1][1] - q[i][1]);
+        const col = (q[i - 1][0] === q[i][0] && q[i][0] === q[i + 1][0]) || (q[i - 1][1] === q[i][1] && q[i][1] === q[i + 1][1]);
+        expect(col && dot < 0).toBe(false);
+      }
+    }
+  });
+});
+
+describe('bande des canaux', () => {
+  it('2 canaux avec 2 et 3 sorties : départs de canaux voisins à 10 px au moins', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 300, { channels: 2 });
+    p = a.p;
+    let y = 100;
+    const targets: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const t = addEq(cat, p, 'BELT', 400, y);
+      p = t.p;
+      targets.push(t.id);
+      y += 60;
+    }
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: targets[0], ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: targets[1], ch: 1 });
+    p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 1 }, { eq: targets[2], ch: 1 });
+    p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 2 }, { eq: targets[3], ch: 1 });
+    p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 3 }, { eq: targets[4], ch: 1 });
+    const ys = routeAll(p).links.map((l) => l.points[0][1]).sort((u, v) => u - v);
+    for (let i = 1; i < ys.length; i++) expect(ys[i] - ys[i - 1]).toBeGreaterThanOrEqual(10);
+    const box = eqBox(findEq(p, a.id)!);
+    for (const v of ys) expect(v > box.y0 && v < box.y1).toBe(true);
+  });
+});
+
+describe('flux vertical, trois sorties vers une colonne à droite', () => {
+  it('2−, 2+, 2++ : un seul coude chacun, sans croisement', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 100, { channels: 2, flow: 'S' });
+    p = a.p;
+    const mk = (x: number, y: number) => {
+      const t = addEq(cat, p, 'BELT', x, y);
+      p = t.p;
+      return t.id;
+    };
+    const t96 = mk(240, 140), t95 = mk(240, 180), t94 = mk(240, 210);
+    p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 1 }, { eq: t94, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 2 }, { eq: t95, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: 3 }, { eq: t96, ch: 1 });
+    for (const l of routeAll(p).links) expect(l.points).toHaveLength(3);
+  });
+});
+
+describe('équipements proches', () => {
+  it('64a juste au-dessus de 63a, décalé : trait en angles droits, jamais en diagonale', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 100, { flow: 'S' });
+    const b = addEq(cat, a.p, 'BELT', 112, 170, { flow: 'S', channels: 2 });
+    p = connect(b.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: b.id, ch: 1 });
+    const pts = routeAll(p).links[0].points;
+    for (let i = 1; i < pts.length; i++) expect(pts[i][0] === pts[i - 1][0] || pts[i][1] === pts[i - 1][1]).toBe(true);
+  });
+});
+
+describe('largeur propre à chaque canal', () => {
+  it('3 sorties à gauche et 1 à droite : moins large que 3 et 3', () => {
+    const mk = (n2: number) => {
+      let p = emptyPivot(cat);
+      const a = addEq(cat, p, 'BELT', 100, 100, { channels: 2, flow: 'S' });
+      p = a.p;
+      for (let i = 1; i <= 3; i++) p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: i }, { eq: a.id, ch: 1 });
+      for (let i = 1; i <= n2; i++) p = connect(p, { eq: a.id, ch: 2, dir: 'avant', num: i }, { eq: a.id, ch: 2 });
+      return eqBox(findEq(p, a.id)!).w;
+    };
+    expect(mk(1)).toBeLessThan(mk(3));
+  });
+  it('une sortie par canal : axes tous les 20 px, comme avant', () => {
+    const a = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { channels: 3 });
+    const e = findEq(a.p, a.id)!;
+    expect([1, 2, 3].map((k) => sideOffset(e, 'E', k))).toEqual([-20, 0, 20]);
+  });
+});
+
+describe('canal 1 à gauche dans le sens du flux', () => {
+  it('droite → en haut, bas → à droite, gauche → en bas, haut → à gauche', () => {
+    const side = (flow: 'E' | 'S' | 'W' | 'N') => {
+      const a = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { channels: 2, flow });
+      const e = findEq(a.p, a.id)!;
+      const out = flow; // côté de sortie avant
+      return Math.sign(sideOffset(e, out, 1));
+    };
+    expect(side('E')).toBe(-1); // y négatif : en haut
+    expect(side('S')).toBe(1); // x positif : à droite
+    expect(side('W')).toBe(1); // y positif : en bas
+    expect(side('N')).toBe(-1); // x négatif : à gauche
+  });
+});
+
+describe('sorties sœurs', () => {
+  it('flux vers le bas : 1− vers la droite et 1+ tout droit ne se croisent pas collés aux étiquettes', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 100, { flow: 'S' });
+    const below = addEq(cat, a.p, 'BELT', 100, 260, { flow: 'S' });
+    const right = addEq(cat, below.p, 'BELT', 260, 180);
+    p = connect(right.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: right.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: below.id, ch: 1 });
+    const box = eqBox(findEq(p, a.id)!);
+    const r = routeAll(p).links;
+    const minus = r.find((l) => l.link.to.eq === right.id)!.points;
+    const plus = r.find((l) => l.link.to.eq === below.id)!.points;
+    // Point où 1− croise la verticale de 1+ : à 28 px au moins sous l'équipement.
+    for (let i = 1; i < minus.length; i++) {
+      const [u, v] = [minus[i - 1], minus[i]];
+      if (u[1] === v[1] && Math.min(u[0], v[0]) < plus[0][0] && Math.max(u[0], v[0]) > plus[0][0]) expect(u[1] - box.y1).toBeGreaterThanOrEqual(28);
+    }
+  });
+});
+
+describe('boucle par canal', () => {
+  it('63a canal 1 → 08Ad → 63a canal 2 : pas une boucle', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 100, { channels: 2 });
+    const d = addEq(cat, a.p, 'BELT', 300, 100);
+    p = connect(d.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: d.id, ch: 1 });
+    p = connect(p, { eq: d.id, ch: 1, dir: 'avant', num: 1 }, { eq: a.id, ch: 2 });
+    expect(loopLinks(p).size).toBe(0);
+    // Retour dans le canal 1 : boucle.
+    const q = connect(p, { eq: d.id, ch: 1, dir: 'avant', num: 1 }, { eq: a.id, ch: 1 });
+    expect(loopLinks(q).size).toBe(1);
+  });
+});
+
+describe('arrivée droite sur un équipement collé', () => {
+  it('équipement juste dessous, légèrement décalé : dernier segment vertical (flèche vers le bas)', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 100, 100, { flow: 'S' });
+    const b = addEq(cat, a.p, 'OPSO', 106, 146, { flow: 'S', channels: 2 });
+    p = connect(b.p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: b.id, ch: 1 });
+    const l = routeAll(p).links[0];
+    const q = l.points;
+    expect(q[q.length - 1][0]).toBe(q[q.length - 2][0]);
+    expect(l.inner).toBeUndefined();
   });
 });

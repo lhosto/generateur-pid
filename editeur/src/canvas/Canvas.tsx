@@ -2,15 +2,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Abbr, getLang, hgLabel, plain, rich, tx } from '../i18n';
 import type { Catalogue } from '../model/catalogue';
-import { boxAt, CH_PITCH, channelOffset, CHUTE_SIZE, eqBox, hg0Of, flowVec, isHorizontal, opposite, snap, SCREEN, type Box } from '../model/geometry';
+import { boxAt, chEdges, leftSign, CHUTE_SIZE, eqBox, hg0Of, flowVec, isHorizontal, opposite, snap, SCREEN, type Box } from '../model/geometry';
 import { axisCandidates } from '../model/straighten';
 import { guideSnap } from '../model/align';
 import {
   addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, removeLink, removeOutput, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
-  placeNext, setLinkTarget,
+  placeNext, setLinkTarget, updateEq,
 } from '../model/ops';
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
-import { handlePositions, loopLinks, outputColor, outputTag, placeTags, shortTag, routeAll, tagAnchor, type Pt } from '../model/route';
+import { handlePositions, loopLinks, outputColor, placeTags, shortTag, tagFor, routeAll, tagAnchor, type Pt } from '../model/route';
 import {
   canAddChannel, canAddOutput, freeOutputNum, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
   chainRepere, zoneOf,
@@ -18,7 +18,7 @@ import {
 import { Icon } from '../ui/ui';
 import { Glyph } from '../panels/Palette';
 import { EqNode } from './EqNode';
-import { ChuteShape } from './symbols';
+import { ChuteShape, labelPos } from './symbols';
 
 export interface Selection {
   eqs: string[];
@@ -48,6 +48,8 @@ interface Props {
   currentNature: string;
   grid: boolean;
   onOpenEq: (id: string) => void;
+  /** Fiche équipement ouverte : le double-clic renomme alors le repère sur place. */
+  drawerOpen: boolean;
   onSize: (w: number, h: number) => void;
   /** Ouvre la planche des HG principaux pour choisir l'équipement à ajouter. */
   onPickOther: (apply: (hg0: string) => void) => void;
@@ -107,6 +109,12 @@ const TAB = { w: 76, h: 16, gap: 4 };
 /** Étiquette « canal.sortie » d'un trait : petite, chasse fixe, halo du fond pour rester lisible sur les traits. */
 const TAG_STYLE: React.CSSProperties = { font: '600 8.5px var(--font-tag)', fill: 'var(--pid-caption)', paintOrder: 'stroke', stroke: 'var(--pid-bg)', strokeWidth: 3, strokeLinejoin: 'round', pointerEvents: 'none' };
 
+/** Texte d'étiquette de sortie : les signes − et + en gras et un peu plus grands, le reste normal. */
+const tagText = (t: string) =>
+  t.split(/([−+]+)/).filter(Boolean).map((part, i) =>
+    /^[−+]+$/.test(part) ? <tspan key={i} style={{ fontWeight: 800, fontSize: 11 }}>{part}</tspan> : part,
+  );
+
 // Textes du canevas : français pour l'opérateur, anglais préparé.
 // « [CH] » dans un texte = terme technique affiché en petit après le mot simple (voir i18n.rich).
 const L = {
@@ -121,6 +129,7 @@ const L = {
   },
   loop: { fr: '↺ Boucle : la matière revient vers un équipement en amont', en: '↺ Loop: material returns to an upstream Equipment item' },
   stubHint: { fr: 'Sortie en attente : clic pour choisir l’équipement [EQ] à raccorder, ou glisser vers un équipement existant · Suppr : la supprimer', en: 'Pending output: click to choose the Equipment item [EQ] to connect, or drag onto an existing one · Del: remove it' },
+  renameAria: { fr: 'Repère client de l’équipement', en: 'Customer tag of the Equipment item' },
   retarget: {
     fr: 'Glisser pour changer de canal [CH] ou d’équipement [EQ] d’arrivée',
     en: 'Drag to change the destination Channel [CH] or Equipment item [EQ]',
@@ -231,7 +240,7 @@ export function Canvas(props: Props) {
   const routed = useMemo(() => routeAll(pivot), [pivot, lang]);
   const loops = useMemo(() => loopLinks(pivot), [pivot.links, pivot.equipments]);
   const tags = useMemo(
-    () => placeTags(pivot, routed.links, (l) => shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir) + (loops.has(l.id) ? ' ↺' : '')),
+    () => placeTags(pivot, routed.links, (l) => shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir)),
     [pivot, routed, loops],
   );
   const selEqs = useMemo(() => new Set(sel.eqs), [sel.eqs]);
@@ -324,6 +333,16 @@ export function Canvas(props: Props) {
   }, []);
 
   const toHost = (p: Pt): Pt => [p[0] * view.zoom + view.px, p[1] * view.zoom + view.py];
+  // Renommage du repère sur place (double-clic, fiche ouverte).
+  const [rename, setRename] = useState<{ id: string; value: string } | null>(null);
+  const endRename = (keep: boolean) => {
+    if (keep && rename) {
+      const eq = findEq(live.current.pivot, rename.id);
+      const v = rename.value.trim();
+      if (eq && v && v !== eq.repere) props.commit(updateEq(live.current.pivot, rename.id, { repere: v }));
+    }
+    setRename(null);
+  };
 
   const hitEq = (p: Pt, exclude?: string): string | null => {
     let found: string | null = null;
@@ -418,9 +437,13 @@ export function Canvas(props: Props) {
     const eq = findEq(live.current.pivot, eqId);
     const b = boxes.get(eqId);
     if (!eq || !b || eq.channels.length <= 1) return 1;
-    const n = eq.channels.length;
     const d = isHorizontal(eq.flow) ? p[1] - b.cy : p[0] - b.cx;
-    return Math.min(n, Math.max(1, Math.round(d / CH_PITCH + (n - 1) / 2) + 1));
+    // Bandes de largeur propre à chaque canal : le canal est celui dont la bande contient le curseur.
+    for (let k = 1; k <= eq.channels.length; k++) {
+      const [lo, hi] = chEdges(eq, k);
+      if (d >= lo && d <= hi) return k;
+    }
+    return d < 0 === leftSign(eq.flow) > 0 ? 1 : eq.channels.length;
   };
 
   // ---------- suivi ----------
@@ -676,7 +699,14 @@ export function Canvas(props: Props) {
         onPointerCancel={onUp}
         onDoubleClick={(e) => {
           const id = hitEq(toWorld(e.clientX, e.clientY));
-          if (id) props.onOpenEq(id);
+          if (!id) return;
+          // Fiche fermée : on l'ouvre ; fiche déjà ouverte : on renomme le repère sur place.
+          const eq = findEq(pivot, id);
+          if (props.drawerOpen && eq) {
+            props.setSel({ ...EMPTY_SEL, eqs: [id] });
+            props.onOpenEq(id);
+            setRename({ id, value: eq.repere });
+          } else props.onOpenEq(id);
         }}
         role="img"
         aria-label={tx(L.aria)}
@@ -735,20 +765,19 @@ export function Canvas(props: Props) {
                     strokeDasharray={l.dashed ? '5 5' : undefined}
                     markerEnd={l.inner ? undefined : `url(#${on ? 'arw-sel' : 'arw-' + Math.min(l.num, 6)})`}
                   />
-                  {(() => {
-                    const ta = tags.get(l.id) ?? tagAnchor(l.points);
+                  {loops.has(l.id) && l.points.length >= 2 && (() => {
+                    // Boucle : un seul ↺, au milieu de l'avant-dernier segment, décalé sur le côté opposé à
+                    // l'arrivée : la flèche reste visible (le trait rejoint souvent un autre trait).
+                    const n = l.points.length;
+                    // Trait droit : au milieu, au-dessus (ou à droite) du trait.
+                    const [a, b, c] = n >= 3 ? [l.points[n - 3], l.points[n - 2], l.points[n - 1]] : [l.points[0], l.points[1], [l.points[1][0] + 1, l.points[1][1] + 1] as Pt];
+                    const mx = (a[0] + b[0]) / 2;
+                    const my = (a[1] + b[1]) / 2;
+                    const vertical = Math.abs(a[0] - b[0]) < 0.5;
+                    const x = vertical ? mx - Math.sign(c[0] - b[0] || 1) * 10 : mx;
+                    const y = vertical ? my : my - Math.sign(c[1] - b[1] || 1) * 10;
                     return (
-                      // Étiquette cliquable : sélectionne le trait (comme un clic sur le trait).
-                      <text x={ta.x} y={ta.y} textAnchor={ta.anchor} dominantBaseline="central" style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'pointer', fill: on ? 'var(--pid-select)' : TAG_STYLE.fill }}>
-                        {shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir)}{loops.has(l.id) ? ' ↺' : ''}
-                      </text>
-                    );
-                  })()}
-                  {loops.has(l.id) && l.points.length >= 3 && (() => {
-                    // Boucle : gros ↺ au dernier coude, là où le trait rejoint son arrivée (souvent sur un autre trait).
-                    const [x, y] = l.points[l.points.length - 2];
-                    return (
-                      <text x={x + 7} y={y - 7} textAnchor="start" dominantBaseline="central" style={{ ...TAG_STYLE, font: '700 14px var(--font-tag)', fill: on ? 'var(--pid-select)' : 'var(--pid-text)', pointerEvents: 'none' }}>
+                      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ ...TAG_STYLE, font: '700 14px var(--font-tag)', fill: on ? 'var(--pid-select)' : 'var(--pid-text)', pointerEvents: 'none' }}>
                         ↺
                       </text>
                     );
@@ -784,7 +813,7 @@ export function Canvas(props: Props) {
                   )}
                   {/* Étiquette dans le prolongement du trait. */}
                   <text x={b[0] + (b[0] - a[0]) * 0.5 + (b[0] === a[0] ? 0 : Math.sign(b[0] - a[0]) * 4)} y={b[1] + (b[1] - a[1]) * 0.5} textAnchor={b[0] === a[0] ? 'middle' : b[0] > a[0] ? 'start' : 'end'} dominantBaseline="central" style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'crosshair', fill: on ? 'var(--pid-select)' : 'var(--abi-orange-text)' }}>
-                    {shortTag(findEq(pivot, s.ref.eq), s.ref.ch, s.ref.num, s.ref.dir)}
+                    {tagText(shortTag(findEq(pivot, s.ref.eq), s.ref.ch, s.ref.num, s.ref.dir))}
                   </text>
                 </g>
               );
@@ -824,6 +853,35 @@ export function Canvas(props: Props) {
             })}
           </g>
 
+          {/* Étiquettes des sorties : par-dessus tous les traits (jamais cachées derrière une flèche). Clic = sélectionner le trait. */}
+          <g>
+            {routed.links.map((l) => {
+              if (wire && wire.mode === 'retarget' && wire.linkId === l.id) return null;
+              const text = shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir);
+              if (!text) return null;
+              const ta = tags.get(l.id) ?? tagAnchor(l.points);
+              const on = sel.link === l.id;
+              return (
+                <text
+                  key={l.id}
+                  x={ta.x}
+                  y={ta.y}
+                  textAnchor={ta.anchor}
+                  dominantBaseline="central"
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    if (e.button === 1 || space.current) return startPan(e);
+                    props.setSel({ ...EMPTY_SEL, link: l.id });
+                    setTip(null);
+                  }}
+                  style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'pointer', fill: on ? 'var(--pid-select)' : TAG_STYLE.fill }}
+                >
+                  {tagText(text)}
+                </text>
+              );
+            })}
+          </g>
+
           {wire && (
             <g pointerEvents="none">
               {wire.target && boxes.get(wire.target) && (() => {
@@ -831,12 +889,13 @@ export function Canvas(props: Props) {
                 const t = findEq(pivot, wire.target)!;
                 const n = t.channels.length;
                 const k = wire.targetCh;
-                // Bande du canal visé : CH_PITCH autour de son axe, comme channelAt et les séparations
-                // dessinées ; les bandes extrêmes vont jusqu'au bord de la boîte.
+                // Bande du canal visé, entre ses séparations (comme channelAt et les séparations
+                // dessinées) ; les bandes extrêmes vont jusqu'au bord de la boîte.
                 const hor = isHorizontal(t.flow);
-                const axis = (hor ? b.cy : b.cx) + channelOffset(n, k);
-                const lo = k === 1 ? (hor ? b.y0 : b.x0) : axis - CH_PITCH / 2;
-                const hi = k === n ? (hor ? b.y1 : b.x1) : axis + CH_PITCH / 2;
+                const c0 = hor ? b.cy : b.cx;
+                const [e0, e1] = chEdges(t, k);
+                const lo = c0 + e0;
+                const hi = c0 + e1;
                 const band = hor
                   ? { x: b.x0 - 3, y: lo, w: b.w + 6, h: hi - lo }
                   : { x: lo, y: b.y0 - 3, w: hi - lo, h: b.h + 6 };
@@ -921,6 +980,30 @@ export function Canvas(props: Props) {
         </div>
       )}
 
+      {rename && (() => {
+        const eq = findEq(pivot, rename.id);
+        const b = boxes.get(rename.id);
+        if (!eq || !b) return null;
+        const lp = labelPos(hg0Of(eq), b);
+        const [hx, hy] = toHost([lp.x, lp.y]);
+        return (
+          <input
+            autoFocus
+            aria-label={tx(L.renameAria)}
+            value={rename.value}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => setRename({ ...rename, value: e.target.value })}
+            onBlur={() => endRename(true)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') endRename(true);
+              if (e.key === 'Escape') endRename(false);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{ position: 'absolute', left: hx - 45, top: hy - 13, width: 90, height: 26, textAlign: 'center', font: '600 14px var(--font-tag)', color: '#fff', background: 'var(--surface-page)', border: '1px solid var(--abi-green)', zIndex: 6, outline: 'none' }}
+          />
+        );
+      })()}
       {selLink && !wire && !menu && (() => {
         const ref = selLink.link.from;
         const src = findEq(pivot, ref.eq);
@@ -948,7 +1031,7 @@ export function Canvas(props: Props) {
                 onClick={() => n !== ref.num && props.commit(setOutputNum(pivot, ref, n))}
                 style={{ ...btn, background: n === ref.num ? 'var(--abi-green)' : 'var(--surface-nav)', color: '#fff' }}
               >
-                {outputTag(ref.ch, n, ref.dir)}
+                {tagFor(findEq(pivot, ref.eq)?.channels.length ?? 1, ref.ch, n, count, ref.dir)}
               </button>
             ))}
             <button

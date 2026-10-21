@@ -345,6 +345,7 @@ export function App() {
               currentNature={current}
               grid={grid}
               onOpenEq={setDrawer}
+              drawerOpen={!!drawer}
               onSize={onSize}
               onPickOther={(apply) => setSheet({ pick: apply })}
               onChosen={setCurrent}

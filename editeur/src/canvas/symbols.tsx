@@ -97,12 +97,12 @@ function decor(hg0: string, base: Base, b: Box) {
 }
 
 /** Séparations de canaux, parallèles au flux (comme les trieurs multicanaux du PID actuel). */
-function dividers(base: Base, b: Box, flow: Flow, n: number) {
+function dividers(base: Base, b: Box, flow: Flow, n: number, cuts?: number[]) {
   if (n < 2) return null;
   const pointy = base === 'diamond' || base === 'circle';
   const d: string[] = [];
   for (let k = 1; k < n; k++) {
-    const mid = (k - n / 2) * CH_PITCH;
+    const mid = cuts?.[k - 1] ?? (k - n / 2) * CH_PITCH;
     if (isHorizontal(flow)) {
       const y = b.cy + mid;
       const inset = pointy ? b.w * 0.3 : 5;
@@ -116,7 +116,7 @@ function dividers(base: Base, b: Box, flow: Flow, n: number) {
   return <path d={d.join(' ')} stroke="var(--pid-divider)" strokeWidth={1} strokeDasharray="3 2" />;
 }
 
-export const Shape = memo(function Shape({ hg0, box, flow, channels, fault }: { hg0: string; box: Box; flow: Flow; channels: number; fault?: boolean }) {
+export const Shape = memo(function Shape({ hg0, box, flow, channels, fault, cuts }: { hg0: string; box: Box; flow: Flow; channels: number; fault?: boolean; cuts?: number[] }) {
   const spec = symbolOf(hg0);
   const look = fault ? { fill: 'var(--pid-fault)', stroke: 'var(--pid-fault-stroke)', sw: 1.5 } : LOOK[spec.base];
   const at = spec.picto ? pictoAt(spec.base, box) : null;
@@ -124,7 +124,7 @@ export const Shape = memo(function Shape({ hg0, box, flow, channels, fault }: { 
     <g>
       {outline(spec.base, box, look)}
       {decor(hg0, spec.base, box)}
-      {dividers(spec.base, box, flow, channels)}
+      {dividers(spec.base, box, flow, channels, cuts)}
       {at && spec.picto && (
         <path
           d={spec.picto}

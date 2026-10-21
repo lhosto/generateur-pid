@@ -31,9 +31,9 @@ export const baseOf = (eq: Pick<Eq, 'hg'>): Base => symbolOf(hg0Of(eq)).base;
 /** Formes allongées : elles s'orientent dans le sens du flux (un tapis qui descend est vertical). */
 const ORIENTED = new Set<Base>(['pill', 'card', 'screen', 'grid', 'para']);
 
-export function sizeOf(base: Base, channels: number, flow: Flow): { w: number; h: number } {
+export function sizeOf(base: Base, channels: number, flow: Flow, pitch = CH_PITCH): { w: number; h: number } {
   const [w, h] = BASE_SIZE[base];
-  const extra = Math.max(0, channels - 1) * CH_PITCH;
+  const extra = Math.max(0, channels - 1) * pitch;
   if (ORIENTED.has(base)) {
     // Longueur le long du flux, fixe ; épaisseur = canaux (plus de canaux = plus haut, pas plus long).
     // À la verticale, un peu plus épais pour le repère.
@@ -48,22 +48,105 @@ export function boxAt(cx: number, cy: number, w: number, h: number): Box {
 }
 
 export function eqBox(eq: Eq): Box {
-  const { w, h } = sizeOf(baseOf(eq), eq.channels.length, eq.flow);
-  return boxAt(eq.x, eq.y, w, h);
+  // Épaisseur (perpendiculaire au flux) : celle des canaux et de leurs départs ; longueur inchangée.
+  const { w, h } = sizeOf(baseOf(eq), 1, eq.flow);
+  const t = thickness(eq);
+  return isHorizontal(eq.flow) ? boxAt(eq.x, eq.y, w, t) : boxAt(eq.x, eq.y, t, h);
 }
 
-/** Décalage de l'axe du canal ch par rapport au centre de l'EQ, perpendiculairement au flux. */
-export function channelOffset(n: number, ch: number): number {
-  return (ch - 1 - (n - 1) / 2) * CH_PITCH;
+/**
+ * Écart voulu entre deux départs voisins : la place d'une étiquette. Flux horizontal : étiquettes
+ * empilées (hauteur 10 + marge) → 12 px ; flux vertical : étiquettes côte à côte (« 2++ ») → 20 px.
+ */
+export const portUnit = (eq: Pick<Eq, 'flow'>) => (isHorizontal(eq.flow) ? 12 : 20);
+
+type ChEq = Pick<Eq, 'channels' | 'flow' | 'hg'>;
+
+/** Place demandée par un canal : celle de ses départs (sens qui en a le plus), CH_PITCH au moins. */
+function need(eq: ChEq, c: Eq['channels'][number]): number {
+  const m = Math.max(1, ...(['avant', 'arriere'] as const).map((d) => c.outputs.filter((o) => o.dir === d).length));
+  return Math.max(CH_PITCH, Math.ceil((m * portUnit(eq)) / GRID) * GRID);
+}
+
+/**
+ * Axes des canaux (décalages depuis le centre, canal 1 d'abord). Deux axes voisins sont écartés de la
+ * moyenne de la place de leurs deux canaux : un canal à 3 sorties écarte ses voisins, un canal à une
+ * sortie garde CH_PITCH (cas courant : axes tous les 20 px, sur la grille).
+ */
+export function chAxes(eq: ChEq): number[] {
+  const n = eq.channels.length;
+  if (n < 2) return [0];
+  const needs = eq.channels.map((c) => need(eq, c));
+  const pos = [0];
+  for (let k = 1; k < n; k++) pos.push(pos[k - 1] + (needs[k - 1] + needs[k]) / 2);
+  const mid = pos[n - 1] / 2;
+  return pos.map((p) => leftSign(eq.flow) * (p - mid));
+}
+
+/**
+ * Canal 1 toujours à gauche dans le sens du flux : en haut (flux vers la droite), à droite (vers le
+ * bas), en bas (vers la gauche), à gauche (vers le haut). 1 : le canal 1 est du côté des coordonnées
+ * basses (haut ou gauche de l'écran) ; -1 : du côté opposé.
+ */
+export const leftSign = (f: Flow): 1 | -1 => (f === 'S' || f === 'W' ? -1 : 1);
+
+export const chAxis = (eq: ChEq, ch: number): number => chAxes(eq)[ch - 1] ?? 0;
+
+/** Limites entre canaux voisins (décalages depuis le centre) : séparations dessinées et choix du canal. */
+export function chCuts(eq: ChEq): number[] {
+  const a = chAxes(eq);
+  const needs = eq.channels.map((c) => need(eq, c));
+  // Limite entre le canal k et le canal k+1, dans l'ordre des canaux.
+  return a.slice(0, -1).map((p, k) => p + leftSign(eq.flow) * (needs[k] / 2));
+}
+
+/** Épaisseur de la forme : forme de base (+ CH_PITCH par canal en plus), élargie si les départs l'exigent. */
+export function thickness(eq: ChEq): number {
+  const n = eq.channels.length;
+  const one = sizeOf(baseOf(eq), 1, eq.flow);
+  const base = (isHorizontal(eq.flow) ? one.h : one.w) + Math.max(0, n - 1) * CH_PITCH;
+  if (n < 2) {
+    const m = Math.max(1, ...(['avant', 'arriere'] as const).map((d) => eq.channels[0]?.outputs.filter((o) => o.dir === d).length ?? 0));
+    return Math.max(base, Math.ceil(((m - 1) * portUnit(eq) + 8) / GRID) * GRID);
+  }
+  const a = chAxes(eq);
+  const needs = eq.channels.map((c) => need(eq, c));
+  return Math.max(base, 2 * Math.max(Math.abs(a[0]) + needs[0] / 2, Math.abs(a[n - 1]) + needs[n - 1] / 2));
+}
+
+/** Place disponible pour les départs du canal ch, centrée sur son axe. */
+export function chRoom(eq: ChEq, ch: number): number {
+  const n = eq.channels.length;
+  const t = thickness(eq);
+  if (n < 2) return t;
+  const a = chAxis(eq, ch);
+  const [lo, hi] = chEdges(eq, ch, t);
+  return 2 * Math.min(a - lo, hi - a);
+}
+
+/** Bords (bas, haut) de la bande du canal ch, en décalage depuis le centre. */
+export function chEdges(eq: ChEq, ch: number, t = thickness(eq)): [number, number] {
+  const n = eq.channels.length;
+  if (n < 2) return [-t / 2, t / 2];
+  const cuts = chCuts(eq);
+  const s = leftSign(eq.flow);
+  const before = ch === 1 ? (s * -t) / 2 : cuts[ch - 2];
+  const after = ch === n ? (s * t) / 2 : cuts[ch - 1];
+  return [Math.min(before, after), Math.max(before, after)];
+}
+
+/** Décalage de l'axe du canal ch, à écart régulier (formes de la bibliothèque, sans sorties). */
+export function channelOffset(n: number, ch: number, pitch = CH_PITCH): number {
+  return (ch - 1 - (n - 1) / 2) * pitch;
 }
 
 /**
  * Décalage, le long d'un côté, du point d'accroche d'un canal : sur les côtés perpendiculaires au flux
  * (entrée / sortie matière), chaque canal a son axe ; sur les autres côtés, le milieu.
  */
-export function sideOffset(eq: Pick<Eq, 'flow' | 'channels'>, side: Flow, ch: number): number {
+export function sideOffset(eq: Pick<Eq, 'flow' | 'channels' | 'hg'>, side: Flow, ch: number): number {
   const n = eq.channels.length;
-  return n > 1 && isHorizontal(side) === isHorizontal(eq.flow) ? channelOffset(n, ch) : 0;
+  return n > 1 && isHorizontal(side) === isHorizontal(eq.flow) ? chAxis(eq, ch) : 0;
 }
 
 export function flowVec(f: Flow): [number, number] {

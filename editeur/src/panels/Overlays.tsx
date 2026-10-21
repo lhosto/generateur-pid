@@ -24,7 +24,7 @@ const L = {
   outputs: { fr: 'Sorties', en: 'Outputs' },
   forwardLine: { fr: 'marche avant', en: 'forward' },
   reverseLine: { fr: 'marche arrière (AR)', en: 'reverse (AR)' },
-  tagMeaning: { fr: 'canal 1, sortie 2 (rien si une seule sortie)', en: 'channel 1, output 2 (none if single output)' },
+  tagMeaning: { fr: 'canal 1, sortie positive (− négative, ++ 2e positive ; 1.1, 1.2… dès 4 sorties)', en: 'channel 1, positive output (− negative, ++ 2nd positive; 1.1, 1.2… from 4 outputs)' },
   pendingMeaning: { fr: 'sortie en attente : à raccorder ou supprimer', en: 'pending output: connect or remove it' },
   loopMeaning: { fr: 'boucle, retour en amont', en: 'loop, back upstream' },
   colorsTbc: { fr: 'couleurs à valider', en: 'colors to be confirmed' },
@@ -153,7 +153,7 @@ export function Legend() {
         {item('av', outputColor(1), tx(L.forwardLine))}
         {item('ar', outputColor(1), tx(L.reverseLine), '4 3')}
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
-          <span style={{ width: 22, font: '600 9px var(--font-tag)', color: 'var(--pid-caption)', textAlign: 'center' }}>1.2</span>
+          <span style={{ width: 22, font: '600 9px var(--font-tag)', color: 'var(--pid-caption)', textAlign: 'center' }}>1+</span>
           {tx(L.tagMeaning)}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>

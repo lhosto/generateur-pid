@@ -49,3 +49,18 @@
 | Ordre des départs | Flux horizontal : 1.1 (−) en bas, 1.2 (+), 1.3 (++)… au-dessus ; flux vertical : 1.2 à droite de 1.1. Croisements imposés par cet ordre acceptés (renuméroter pour les éviter), jamais deux traits superposés | Décidé | 21/10/2026 |
 | Boucle par la marche arrière | Un circuit qui passe par une sortie AR (088 AR → 091 → 092 → 086) est une boucle : ↺ sur le lien de retour, et gros ↺ là où il rejoint son arrivée. Le lien de retour reste plein (le pointillé est réservé à l'AR) | Proposé | 21/10/2026 |
 | Choix du canal en tirant un trait | Libellé « Canal n » affiché seulement si la cible a plusieurs canaux | Décidé | 21/10/2026 |
+| Étiquette des sorties (remplace la précédente) | 2 ou 3 sorties sur un canal : − (S1), + (S2), ++ (S3), précédé du canal si plusieurs canaux (1−, 1+, 1++) ; une seule : rien ou le numéro du canal ; dès 4 sorties : 1.1, 1.2, 1.3, 1.4… ; « AR » en marche arrière | Décidé | 21/10/2026 |
+| Départ des canaux à plusieurs sorties | 28 px de ligne droite avant tout coude ou croisement (place des étiquettes) | Décidé | 21/10/2026 |
+| Repère de boucle | Un seul ↺, même taille partout, au milieu de l'avant-dernier segment du trait de retour, décalé sur le côté (la flèche reste visible) | Décidé | 21/10/2026 |
+| Étiquettes (compléments) | Signes − / + en gras ; dès 4 sorties, la négative est marquée 1.1(−) ; étiquettes dessinées par-dessus les traits | Décidé | 21/10/2026 |
+| Bande des canaux | Équipement multicanal : écart entre axes de canaux = 10 px par sortie (20 px minimum), la forme s'épaissit d'autant | Décidé | 21/10/2026 |
+| Départ droit sous les étiquettes | 28 px pour un départ horizontal, 16 px pour un départ vertical (étiquette à côté du trait) | Décidé | 21/10/2026 |
+| Espacement des départs | Place d'une étiquette entre deux départs : 12 px en flux horizontal (étiquettes empilées), 20 px en flux vertical (côte à côte) ; la forme s'épaissit d'autant ; toutes les étiquettes sur une rangée, dans l'ordre des départs | Décidé | 21/10/2026 |
+| Double-clic sur un équipement | Fiche fermée : l'ouvre ; fiche ouverte : renomme le repère client sur place (Entrée valide, Échap annule) | Décidé | 21/10/2026 |
+| Équipements proches face à face | Départ droit et approche se partagent la place ; jamais de trait en diagonale | Décidé | 21/10/2026 |
+| Largeur des canaux | Chaque canal a la place de ses propres départs (un canal à 3 sorties s'élargit, son voisin à 1 sortie non) ; cas courant inchangé (axes tous les 20 px) | Décidé | 21/10/2026 |
+| Canal 1 | Toujours à gauche dans le sens du flux : en haut (flux →), à droite (flux ↓), en bas (flux ←), à gauche (flux ↑) | Décidé | 21/10/2026 |
+| Forme « carte » (machines) | Réduite de 64×32 à 56×24 : même épaisseur que le convoyeur | Décidé | 21/10/2026 |
+| « + » de sortie | Même taille et même distance pour tous, symétriques d'un canal à l'autre | Décidé | 21/10/2026 |
+| Sorties sœurs | Jamais de croisement à moins de 28 px de l'équipement (zone des étiquettes) | Décidé | 21/10/2026 |
+| Boucle | Calculée par canal : boucle si la matière revient dans un canal où elle est déjà passée ; revenir dans un autre canal du même équipement n'en est pas une | Décidé | 21/10/2026 |
