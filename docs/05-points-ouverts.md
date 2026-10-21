@@ -30,9 +30,10 @@
 | Menu du « + » d'une sortie | Convoyeur en tête par défaut, puis le dernier choix, puis « Autre équipement… » (planche complète) | | |
 | Doublons de repère | Repère client et repère Aktid contrôlés sans tenir compte des majuscules ni des espaces (08aa = 08Aa) ; « Dupliquer » vide le repère Aktid de la copie | | |
 | Sortie en attente de raccordement | Tout nouvel équipement (sauf « sans action ») et tout nouveau canal arrive avec sa sortie 1 marche avant déclarée, libre, en orange ; clic dessus (« + » au survol) = choisir l'équipement à raccorder ; Suppr = la supprimer | Décidé | 21/10/2026 |
-| Étiquette courte des sorties | Un canal, une sortie → rien ; un canal, plusieurs sorties → « 2 » ; une sortie par canal → numéro de canal ; sinon « 1.2 ». « AR » ajouté en marche arrière | Décidé | 21/10/2026 |
+| Étiquette des sorties | Toujours « canal.sortie » (1.1, 2.1…), sauf un seul canal avec une seule sortie → rien. « AR » ajouté en marche arrière | Décidé | 21/10/2026 |
 | Taille du convoyeur | Réduite de 56×28 à 48×24 (32×48 à la verticale) | | |
 | Type d'une sortie unique | Seule sortie du canal dans ce sens : « sortie principale » (ni négative ni positive) ; dès 2 sorties : S1 négative, suivantes positives | Décidé | 21/10/2026 |
 | Repère de l'équipement suivant (même type) | Prolonge le repère de départ : 04a → 04b ; 10 → 11 ; si l'amont donne un pas (10, 20), il est conservé (30, 40). Autre type : préfixe par HG0 | Décidé | 21/10/2026 |
 | Départs de plusieurs sorties sur un canal | Groupe centré sur l'axe du canal, réparti dans la bande du canal (S1 à gauche / en haut, S2… à droite / en dessous) ; sorties en attente comprises. Étiquettes 1.1, 1.2 dès 2 sorties sur un canal | Décidé | 21/10/2026 |
 | Taille selon les canaux | Plus de canaux = forme plus épaisse, jamais plus longue | Décidé | 21/10/2026 |
+| Traits parallèles | Deux traits vers des équipements différents restent à 8 px au moins l'un de l'autre ; vers le même point d'arrivée, ils se rejoignent | Décidé | 21/10/2026 |

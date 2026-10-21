@@ -43,17 +43,14 @@ export const outputColor = (_num: number) => 'var(--pid-stroke-light)';
 export const outputTag = (ch: number, num: number, dir: Dir) => `${ch}.${num}${dir === 'arriere' ? ' AR' : ''}`;
 
 /**
- * Étiquette courte d'une sortie sur le PID, selon ce qui suffit à la distinguer (par sens) :
- * un seul canal et une seule sortie → rien (« AR » seul en marche arrière) ; une sortie au plus par
- * canal → numéro de canal ; plusieurs sorties sur un canal → « canal.sortie » (1.1, 1.2).
+ * Étiquette d'une sortie sur le PID : toujours « canal.sortie » (1.1, 2.1…), sauf un seul canal avec une
+ * seule sortie dans ce sens → rien (« AR » seul en marche arrière).
  */
 export function shortTag(eq: Eq | undefined, ch: number, num: number, dir: Dir): string {
   const ar = dir === 'arriere' ? 'AR' : '';
   if (!eq) return outputTag(ch, num, dir);
-  const counts = eq.channels.map((c) => c.outputs.filter((o) => o.dir === dir).length);
-  const multi = eq.channels.length > 1;
-  const many = counts.some((n) => n > 1);
-  const core = many ? `${ch}.${num}` : multi ? `${ch}` : '';
+  const alone = eq.channels.length === 1 && eq.channels[0].outputs.filter((o) => o.dir === dir).length <= 1;
+  const core = alone ? '' : `${ch}.${num}`;
   return [core, ar].filter(Boolean).join(' ');
 }
 
@@ -240,6 +237,15 @@ function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], other
   const all = [...others, ...ends];
   const ok = (pts: Pt[]) => {
     const full = simplify(pts);
+    // Demi-tour juste avant la flèche qui garde le sens d'arrivée (… a, b, t avec a entre b et t) : b
+    // ne sert à rien, le trait arrive directement.
+    if (full.length >= 3) {
+      const [a, b, c] = full.slice(-3);
+      const col = (Math.abs(a[0] - b[0]) < 0.5 && Math.abs(b[0] - c[0]) < 0.5) || (Math.abs(a[1] - b[1]) < 0.5 && Math.abs(b[1] - c[1]) < 0.5);
+      const back = (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]) < 0;
+      const keepsWay = (c[0] - a[0]) * (c[0] - b[0]) + (c[1] - a[1]) * (c[1] - b[1]) > 0;
+      if (col && back && keepsWay) full.splice(full.length - 2, 1);
+    }
     // Le premier et le dernier segment touchent leur équipement : vérifiés contre les autres seulement.
     for (let i = 1; i < full.length; i++) {
       const obs = i === 1 || i === full.length - 1 ? others : all;
@@ -275,11 +281,13 @@ interface Placed {
 }
 
 const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
+/** Écart minimal entre deux traits parallèles qui ne vont pas au même endroit. */
+const GAP = 8;
 
 /**
- * Deux segments orthogonaux se croisent (intersection strictement intérieure aux deux), ou se
- * superposent sur la même ligne. La superposition est permise si les deux traits vont au même point
- * d'arrivée (ils se rejoignent avant la flèche) ; le croisement, jamais.
+ * Deux segments orthogonaux se croisent (intersection strictement intérieure aux deux), ou courent
+ * côte à côte à moins de GAP (on ne les distinguerait plus). Côte à côte est permis si les deux traits
+ * vont au même point d'arrivée (ils se rejoignent avant la flèche) ; le croisement, jamais.
  */
 function conflicts(a0: Pt, a1: Pt, b0: Pt, b1: Pt, sameEnd: boolean): boolean {
   const aH = near(a0[1], a1[1]);
@@ -293,8 +301,8 @@ function conflicts(a0: Pt, a1: Pt, b0: Pt, b1: Pt, sameEnd: boolean): boolean {
     return v[0] > h[0] + 0.5 && v[0] < h[1] - 0.5 && h[2] > v[1] + 0.5 && h[2] < v[2] - 0.5;
   }
   if (sameEnd) return false;
-  if (aH) return near(a0[1], b0[1]) && Math.min(ax1, bx1) - Math.max(ax0, bx0) > 1;
-  return near(a0[0], b0[0]) && Math.min(ay1, by1) - Math.max(ay0, by0) > 1;
+  if (aH) return Math.abs(a0[1] - b0[1]) < GAP && Math.min(ax1, bx1) - Math.max(ax0, bx0) > 1;
+  return Math.abs(a0[0] - b0[0]) < GAP && Math.min(ay1, by1) - Math.max(ay0, by0) > 1;
 }
 
 /** Le tracé ne croise (ni ne longe) aucun trait déjà posé. */

@@ -24,7 +24,7 @@ const L = {
   outputs: { fr: 'Sorties', en: 'Outputs' },
   forwardLine: { fr: 'marche avant', en: 'forward' },
   reverseLine: { fr: 'marche arrière (AR)', en: 'reverse (AR)' },
-  tagMeaning: { fr: 'canal 1, sortie 2 (écrit seulement si utile)', en: 'channel 1, output 2 (shown only when needed)' },
+  tagMeaning: { fr: 'canal 1, sortie 2 (rien si une seule sortie)', en: 'channel 1, output 2 (none if single output)' },
   pendingMeaning: { fr: 'sortie en attente : à raccorder ou supprimer', en: 'pending output: connect or remove it' },
   loopMeaning: { fr: 'boucle, retour en amont', en: 'loop, back upstream' },
   colorsTbc: { fr: 'couleurs à valider', en: 'colors to be confirmed' },

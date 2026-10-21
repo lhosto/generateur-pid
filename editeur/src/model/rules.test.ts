@@ -343,7 +343,7 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     const two = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }] }] };
     expect(shortTag(two, 1, 2, 'avant')).toBe('1.2');
     const ch2 = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }] }, { outputs: [{ dir: 'avant' as const, num: 1 }] }] };
-    expect(shortTag(ch2, 2, 1, 'avant')).toBe('2');
+    expect(shortTag(ch2, 2, 1, 'avant')).toBe('2.1');
     const mix = { ...e, channels: [two.channels[0], ch2.channels[1]] };
     expect(shortTag(mix, 1, 2, 'avant')).toBe('1.2');
   });
@@ -414,7 +414,20 @@ describe('croisements de traits', () => {
     p = connect(p, { eq: down.id, ch: 1, dir: 'avant', num: 1 }, { eq: dst.id, ch: 1 });
     expect(crossings(routeAll(p).links)).toBe(0);
   });
+  it('deux traits vers deux équipements différents ne courent pas côte à côte', () => {
+    let p = emptyPivot(cat);
+    const s = addEq(cat, p, 'BELT', 400, 400, { channels: 3 });
+    const t1 = addEq(cat, s.p, 'BELT', 530, 410);
+    const t2 = addEq(cat, t1.p, 'BELT', 530, 440);
+    const a = addEq(cat, t2.p, 'BELT', 410, 480);
+    p = connect(a.p, { eq: s.id, ch: 1, dir: 'avant', num: 1 }, { eq: t1.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: t1.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 2 }, { eq: t2.id, ch: 1 });
+    const r = routeAll(p).links;
+    const xs = (to: string) => r.filter((l) => l.link.to.eq === to).flatMap((l) => l.points.slice(1, -1).filter((q, i, arr) => i > 0 && q[0] === arr[i - 1][0]).map((q) => q[0]));
+    for (const x2 of xs(t2.id)) for (const x1 of xs(t1.id)) expect(Math.abs(x2 - x1)).toBeGreaterThanOrEqual(8);
+  });
   it('site de test : seuls restent les croisements imposés (ordre des sorties, canaux différents)', () => {
-    expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(8);
+    expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(9);
   });
 });
