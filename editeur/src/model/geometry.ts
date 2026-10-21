@@ -64,7 +64,7 @@ type ChEq = Pick<Eq, 'channels' | 'flow' | 'hg'>;
 
 /** Place demandée par un canal : celle de ses départs (sens qui en a le plus), CH_PITCH au moins. */
 function need(eq: ChEq, c: Eq['channels'][number]): number {
-  const m = Math.max(1, ...(['avant', 'arriere'] as const).map((d) => c.outputs.filter((o) => o.dir === d).length));
+  const m = Math.max(1, ...(['avant', 'arriere'] as const).map((d) => c.outputs.filter((o) => o.dir === d && !o.docked).length));
   return Math.max(CH_PITCH, Math.ceil((m * portUnit(eq)) / GRID) * GRID);
 }
 
@@ -106,7 +106,7 @@ export function thickness(eq: ChEq): number {
   const one = sizeOf(baseOf(eq), 1, eq.flow);
   const base = (isHorizontal(eq.flow) ? one.h : one.w) + Math.max(0, n - 1) * CH_PITCH;
   if (n < 2) {
-    const m = Math.max(1, ...(['avant', 'arriere'] as const).map((d) => eq.channels[0]?.outputs.filter((o) => o.dir === d).length ?? 0));
+    const m = Math.max(1, ...(['avant', 'arriere'] as const).map((d) => eq.channels[0]?.outputs.filter((o) => o.dir === d && !o.docked).length ?? 0));
     return Math.max(base, Math.ceil(((m - 1) * portUnit(eq) + 8) / GRID) * GRID);
   }
   const a = chAxes(eq);

@@ -87,7 +87,10 @@ export function arMark(points: Pt[]): { x: number; y: number; anchor: 'start' | 
 
 export function shortTag(eq: Eq | undefined, ch: number, num: number, dir: Dir): string {
   if (!eq) return outputTag(ch, num, dir);
-  const count = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir).length;
+  // Overband / poulie accolé sur ce canal (sortie « k+ » au joint) : la sortie principale devient « k− ».
+  const outs = eq.channels[ch - 1]?.outputs ?? [];
+  if (outs.some((o) => o.dir === dir && o.docked) && !outs.some((o) => o.dir === dir && o.num === num && o.docked)) return `${ch}−`;
+  const count = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir && !o.docked).length;
   return tagFor(eq.channels.length, ch, num, count, dir, isSeparation(eq.hg[0]?.type ?? ''));
 }
 
@@ -538,7 +541,8 @@ const slot = (eq: Eq, ch: number, dir: Dir, rank: number, count: number) =>
  * gauche (flux vertical), puis S2, S3… au-dessus / à droite. Une sortie seule est sur l'axe.
  */
 export function portOffset(eq: Eq, _box: Box, ch: number, dir: Dir, num: number): number {
-  const nums = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir).map((o) => o.num).sort((a, b) => a - b);
+  // Sorties accolées (overband posé sur le tapis) exclues : elles n'ont pas de départ dessiné.
+  const nums = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir && !o.docked).map((o) => o.num).sort((a, b) => a - b);
   return slot(eq, ch, dir, Math.max(0, nums.indexOf(num)), nums.length);
 }
 
@@ -706,7 +710,7 @@ export function handlePositions(eq: Eq, box: Box, dir: Dir): { ch: number; at: P
   const [vx, vy] = flowVec(side);
   return eq.channels.map((c, i) => {
     const [ax, ay] = channelAnchor(eq, box, side, i + 1);
-    const count = c.outputs.filter((o) => o.dir === dir).length;
+    const count = c.outputs.filter((o) => o.dir === dir && !o.docked).length;
     const used = count > 0;
     // À la place de la sortie suivante, un peu au-delà du bout des traits.
     // Canal déjà raccordé : petit « + » au bout de la place de la sortie suivante, comme celui d'une

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import catJson from '../catalogue.json';
 import type { Catalogue } from './catalogue';
-import { addChannel, addEq, emptyPivot, findEq, moveItems } from './ops';
+import { addChannel, addEq, emptyPivot, findEq, moveItems, removeChannel } from './ops';
 import { dockedLinks, dockedOn, dockOnDrop, settleDocked, touching } from './dock';
 import { eqBox } from './geometry';
-import { routeAll } from './route';
+import { routeAll, shortTag } from './route';
 
 const cat = catJson as unknown as Catalogue;
 
@@ -56,6 +56,26 @@ describe('overband accolé au convoyeur', () => {
     const q = settleDocked(addChannel(p, c));
     expect(touching(eqBox(findEq(q, c)!), eqBox(findEq(q, m)!))).toBe(true);
     expect(routeAll(q).links.find((l) => l.link.to.eq === m)!.docked).toBeDefined();
+  });
+  it('l’overband posé dessus n’élargit pas le convoyeur', () => {
+    const before = eqBox(addEq(cat, emptyPivot(cat), 'BELT', 300, 300).p.equipments[0]);
+    const { p, c } = setup();
+    const after = eqBox(findEq(p, c)!);
+    expect([after.w, after.h]).toEqual([before.w, before.h]);
+  });
+  it('overband accolé : la sortie principale du canal devient 1− (le joint est 1+)', () => {
+    const { p, c } = setup(2);
+    const e = findEq(p, c)!;
+    expect(shortTag(e, 1, 1, 'avant')).toBe('1−');
+    expect(shortTag(e, 2, 1, 'avant')).toBe('2−');
+  });
+  it('canal 1 du tapis supprimé : l’overband reste relié (canal 1), toujours accolé', () => {
+    const { p, c, m } = setup(2);
+    const q = settleDocked(removeChannel(p, c, 1));
+    const links = q.links.filter((l) => l.from.eq === c && l.to.eq === m);
+    expect(links.length).toBeGreaterThanOrEqual(1);
+    expect(links.every((l) => l.from.ch === 1 && l.from.num >= 2)).toBe(true);
+    expect(findEq(q, m)!.dockedTo).toBe(c);
   });
   it('lâché loin : pas accolé', () => {
     let p = emptyPivot(cat);

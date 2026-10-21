@@ -3,7 +3,7 @@
 // pas en trait : les deux formes se touchent, un joint plein marque le contact (cliquable).
 import { eqBox, isHorizontal, type Box } from './geometry';
 import { addOutput, connect, findEq, setPositions, updateEq } from './ops';
-import type { Eq, Pivot } from './pivot';
+import type { Eq, OutputRef, Pivot } from './pivot';
 import { symbolOf } from './symbols';
 
 /** HG principaux qui s'accolent à un convoyeur (règle donnée pour overbands et poulies). */
@@ -52,6 +52,33 @@ export function dockedOn(p: Pivot, convId: string): string[] {
   return p.equipments.filter((e) => e.dockedTo === convId).map((e) => e.id);
 }
 
+/**
+ * Lien accolé du canal k du tapis vers le canal 1 de la machine. Jamais sur la sortie 1 du canal
+ * (réservée à la suite de la ligne) : si elle manque, on la déclare d'abord, en attente.
+ */
+function linkDocked(p: Pivot, convId: string, k: number, machId: string): Pivot {
+  let o = addOutput(p, convId, k, 'avant');
+  if (o.ref && o.ref.num === 1) o = addOutput(o.p, convId, k, 'avant');
+  return o.ref ? markDocked(connect(o.p, o.ref, { eq: machId, ch: 1 }), o.ref, true) : p;
+}
+
+/** Marque (ou démarque) une sortie du tapis comme accolée. */
+function markDocked(p: Pivot, ref: OutputRef, docked: boolean): Pivot {
+  return {
+    ...p,
+    equipments: p.equipments.map((e) =>
+      e.id !== ref.eq
+        ? e
+        : {
+            ...e,
+            channels: e.channels.map((c, i) =>
+              i !== ref.ch - 1 ? c : { outputs: c.outputs.map((o) => (o.dir === ref.dir && o.num === ref.num ? { ...o, docked: docked || undefined } : o)) },
+            ),
+          },
+    ),
+  };
+}
+
 /** Position collée au flanc du convoyeur, du côté où se trouve la machine, centrée sur lui. */
 function sidePosition(conv: Eq, mach: Eq): { x: number; y: number } {
   const cb = eqBox(conv);
@@ -80,7 +107,14 @@ export function settleDocked(p: Pivot): Pivot {
     changed = true;
     return { ...m, ...at };
   });
-  return changed ? { ...p, equipments } : p;
+  let next = changed ? { ...p, equipments } : p;
+  // Toujours au moins un lien depuis son tapis (canal supprimé, lien effacé…) : de nouveau sur le canal 1.
+  for (const m of next.equipments) {
+    if (!m.dockedTo || !eqs.has(m.dockedTo)) continue;
+    if (next.links.some((l) => l.from.eq === m.dockedTo && l.to.eq === m.id)) continue;
+    next = linkDocked(next, m.dockedTo, 1, m.id);
+  }
+  return next;
 }
 
 /**
@@ -105,7 +139,13 @@ export function dockOnDrop(p: Pivot, machId: string): Pivot {
     if (d < bestD) (bestD = d), (best = e);
   }
   // Lâchée loin de tout convoyeur : elle n'est plus accolée (le lien, s'il existe, redevient un trait).
-  if (!best) return mach.dockedTo ? updateEq(p, machId, { dockedTo: undefined }) : p;
+  if (!best) {
+    if (!mach.dockedTo) return p;
+    // Ses liens redeviennent des traits : les sorties du tapis retrouvent leur place.
+    let q = updateEq(p, machId, { dockedTo: undefined });
+    for (const l of q.links) if (l.from.eq === mach.dockedTo && l.to.eq === machId) q = markDocked(q, l.from, false);
+    return q;
+  }
   const conv = best;
   let next = p;
   next = updateEq(next, machId, { dockedTo: conv.id });
@@ -113,11 +153,7 @@ export function dockOnDrop(p: Pivot, machId: string): Pivot {
   for (let k = 1; k <= conv.channels.length; k++) {
     if (next.links.some((l) => l.from.eq === conv.id && l.from.ch === k && l.to.eq === machId)) continue;
     // La machine n'a qu'un canal : chaque canal du tapis arrive sur son canal 1.
-    // Jamais sur la sortie 1 du canal (réservée à la suite de la ligne) : si elle manque, on la déclare
-    // d'abord, en attente, puis on prend la suivante.
-    let o = addOutput(next, conv.id, k, 'avant');
-    if (o.ref && o.ref.num === 1) o = addOutput(o.p, conv.id, k, 'avant');
-    if (o.ref) next = connect(o.p, o.ref, { eq: machId, ch: 1 });
+    next = linkDocked(next, conv.id, k, machId);
   }
   return next;
 }

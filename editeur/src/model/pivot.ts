@@ -19,6 +19,8 @@ export interface Hg {
 export interface Output {
   dir: Dir;
   num: number;
+  /** Sortie vers un overband / une poulie accolé : pas de trait, ni place de départ, ni largeur de canal. */
+  docked?: boolean;
 }
 
 export interface Channel {
