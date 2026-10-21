@@ -6,6 +6,7 @@ import type { Catalogue } from '../model/catalogue';
 import { addChute, addEq, addProximity, connect, emptyPivot, findEq, setChainType, type NewEqOpts } from '../model/ops';
 import type { Dir, Pivot } from '../model/pivot';
 import { nextOutputNum } from '../model/rules';
+import { straighten } from '../model/straighten';
 
 const X = (c: number) => 90 + c * 130;
 const Y = (r: number) => 110 + r * 110;
@@ -153,7 +154,8 @@ export function siteTest(cat: Catalogue): Pivot {
     if (!cat.noAction.includes(e.hg[0].type) && e.hg.length > 1) actuators[e.id] = ['loop-400A'];
   }
   for (const r of ['08Ae', '13Pa', '08Af', '08Fd', '13Ca', '08Fe']) actuators[id[r]] = ['loop-400A', 'loop-400B'];
-  return { ...p, safety: { loops, inputs, actuators, validated: null } };
+  // Traits alignés : chaque EQ sur l'axe du canal auquel il est relié.
+  return straighten({ ...p, safety: { loops, inputs, actuators, validated: null } });
 }
 
 /** Test de charge : ~200 EQ en chaînes, pour vérifier la fluidité à la densité d'un vrai site. */

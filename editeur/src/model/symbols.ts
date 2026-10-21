@@ -1,6 +1,7 @@
 // Visuel PID de chaque HG principal (forme de base + pictogramme). PROPOSITION de maquette, à valider
 // puis à reporter dans la colonne « P&D - Symbole » de la liste SharePoint des HG.
 // Formes de base reprises du synoptique SCADA 2026 ; pictogrammes monotrait dessinés dans une boîte 12×12.
+import { tx, type Entry } from '../i18n';
 
 export type Base =
   | 'pill' | 'card' | 'screen' | 'grid' | 'diamond' | 'para' | 'circle' | 'silo' | 'hopper' | 'cabinet' | 'desk' | 'unknown';
@@ -9,7 +10,7 @@ export interface SymbolSpec {
   base: Base;
   /** Tracé du pictogramme, coordonnées 0..12. */
   picto?: string;
-  /** Groupe d'affichage dans la bibliothèque (présentation seulement). */
+  /** Groupe d'affichage dans la bibliothèque (présentation seulement ; clé de GROUP_ORDER, libellé dans GROUP_LABELS). */
   group: string;
 }
 
@@ -120,10 +121,28 @@ export const SYMBOLS: Record<string, SymbolSpec> = {
   CYL: { base: 'card', picto: P.cylinder, group: 'Électrique et commande' },
 };
 
+/** Ordre des groupes : les noms français servent de clés (SymbolSpec.group), l'affichage passe par GROUP_LABELS. */
 export const GROUP_ORDER = [
   'Convoyage', 'Tri et séparation', 'Criblage', 'Magnétique', 'Ouverture, broyage, presses',
   'Stockage et dosage', 'Air et dépoussiérage', 'Analyse', 'Électrique et commande', 'Sans symbole',
 ];
+
+/** Libellé affiché de chaque groupe (français / anglais). */
+export const GROUP_LABELS: Record<string, Entry> = {
+  'Convoyage': { fr: 'Convoyage', en: 'Conveying' },
+  'Tri et séparation': { fr: 'Tri et séparation', en: 'Sorting and separation' },
+  'Criblage': { fr: 'Criblage', en: 'Screening' },
+  'Magnétique': { fr: 'Magnétique', en: 'Magnetic' },
+  'Ouverture, broyage, presses': { fr: 'Ouverture, broyage, presses', en: 'Bag opening, shredding, presses' },
+  'Stockage et dosage': { fr: 'Stockage et dosage', en: 'Storage and dosing' },
+  'Air et dépoussiérage': { fr: 'Air et dépoussiérage', en: 'Air and dust extraction' },
+  'Analyse': { fr: 'Analyse', en: 'Analysis' },
+  'Électrique et commande': { fr: 'Électrique et commande', en: 'Electrical and control' },
+  'Sans symbole': { fr: 'Sans symbole', en: 'No symbol' },
+};
+
+/** Nom affiché d'un groupe dans la langue courante (la clé elle-même si elle n'est pas traduite). */
+export const groupLabel = (g: string) => (GROUP_LABELS[g] ? tx(GROUP_LABELS[g]) : g);
 
 /** HG principal sans visuel défini : forme neutre, signalée « symbole à définir ». */
 export const symbolOf = (hg0: string): SymbolSpec => SYMBOLS[hg0] ?? { base: 'unknown', group: 'Sans symbole' };

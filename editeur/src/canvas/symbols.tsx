@@ -2,7 +2,7 @@
 // synoptique SCADA 2026 en version édition (pas de barre d'état ni de couleur d'animation).
 // Seule une erreur de génération colore la forme (rouge défaut).
 import { memo } from 'react';
-import { isHorizontal, type Box } from '../model/geometry';
+import { CH_PITCH, isHorizontal, type Box } from '../model/geometry';
 import type { Flow } from '../model/pivot';
 import { symbolOf, type Base } from '../model/symbols';
 
@@ -88,12 +88,13 @@ function dividers(base: Base, b: Box, flow: Flow, n: number) {
   const pointy = base === 'diamond' || base === 'circle';
   const d: string[] = [];
   for (let k = 1; k < n; k++) {
+    const mid = (k - n / 2) * CH_PITCH;
     if (isHorizontal(flow)) {
-      const y = b.y0 + (k * b.h) / n;
+      const y = b.cy + mid;
       const inset = pointy ? b.w * 0.3 : 5;
       d.push(`M${b.x0 + inset} ${y}H${b.x1 - inset}`);
     } else {
-      const x = b.x0 + (k * b.w) / n;
+      const x = b.cx + mid;
       const inset = pointy ? b.h * 0.3 : 5;
       d.push(`M${x} ${b.y0 + inset}V${b.y1 - inset}`);
     }

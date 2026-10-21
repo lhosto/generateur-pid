@@ -24,6 +24,15 @@ npm run build        # catalogue + contrôle des types + dist/editeur-pid.html
 
 `scripts/catalogue.mjs` assemble les deux sources dans `src/catalogue.json`. Vite l'injecte ensuite dans le bloc `<script id="catalogue">` de la page. Plus tard, le logiciel Openness réécrira ce même bloc avec l'export de la librairie.
 
+## Textes et police
+
+- Tous les textes vus par l'opérateur passent par `src/i18n.tsx` : `tx({ fr, en })`, `<Term k="hg" />` (mot simple puis terme technique en petit), `termText()` pour les chaînes simples, `hgLabel()` pour les libellés de la liste HG. Le français est la langue par défaut ; la bascule FR/EN est dans l'en-tête.
+- Police d'interface : Inter Tight (variable, latin seulement, embarquée). Repères et noms TIA : IBM Plex Mono.
+
+## Traits alignés
+
+Chaque canal a un axe fixe, tous les 20 px et sur la grille (`geometry.CH_PITCH`). Les liens partent et arrivent exactement sur cet axe. Le « + » pose l'équipement suivant sur l'axe. En glissant un équipement, il s'aimante sur l'axe de ses canaux reliés. « Redresser » (`model/straighten.ts`) remet sur l'axe les équipements presque alignés.
+
 ## Structure
 
 - `src/model/` : logique pure, sans React.

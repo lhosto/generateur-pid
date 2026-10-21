@@ -2,11 +2,35 @@
 // Glisser = poser ; clic = HG0 utilisé par les gestes « + » (mémoire du dernier choix).
 import { useState } from 'react';
 import { Shape, ChuteShape } from '../canvas/symbols';
-import { principals, type Catalogue } from '../model/catalogue';
+import { Abbr, getLang, hgLabel, tx } from '../i18n';
+import { etatLabel, principals, type Catalogue } from '../model/catalogue';
 import { boxAt, sizeOf } from '../model/geometry';
-import { GROUP_ORDER, symbolOf } from '../model/symbols';
+import { GROUP_ORDER, groupLabel, symbolOf } from '../model/symbols';
 import { Icon, inputStyle, PanelHead } from '../ui/ui';
 import { Legend } from './Overlays';
+
+const L = {
+  title: { fr: 'Bibliothèque', en: 'Library' },
+  subtitle: { fr: 'Matériels génériques principaux', en: 'Main Hardware Generic' },
+  sheet: { fr: 'Planche des symboles', en: 'Symbol chart' },
+  searchAria: { fr: 'Chercher un matériel générique principal · HG', en: 'Search main Hardware Generic · HG' },
+  searchPh: { fr: 'Chercher (code, libellé)…', en: 'Search (code, name)…' },
+  status: { fr: 'État logiciel :', en: 'Software status:' },
+  wincc: { fr: 'ID WinCC :', en: 'WinCC ID:' },
+  rowHelp: {
+    fr: 'Glisser sur le PID pour poser · clic : à poser avec les « + » · double-clic : poser au centre',
+    en: 'Drag onto the P&ID to place · click: place it with “+” · double-click: place at centre',
+  },
+  drawing: { fr: 'Dessin', en: 'Drawing' },
+  chute: { fr: 'Goulotte de tri', en: 'Sorting chute' },
+  chuteShort: { fr: 'Goulotte', en: 'Chute' },
+  chuteHelp: {
+    fr: 'Goulotte de tri — objet de dessin (statut dans le pivot à confirmer)',
+    en: 'Sorting chute — drawing object (status in the pivot file to be confirmed)',
+  },
+  plusOn: { fr: 'sur un équipement', en: 'on an Equipment item' },
+  plusPlaces: { fr: 'pose :', en: 'places:' },
+};
 
 export function Glyph({ hg0, width = 72, height = 44 }: { hg0: string; width?: number; height?: number }) {
   const { w, h } = sizeOf(symbolOf(hg0).base, 1, 'E');
@@ -17,6 +41,7 @@ export function Glyph({ hg0, width = 72, height = 44 }: { hg0: string; width?: n
   );
 }
 
+// Couleur par état logiciel (clés = valeurs brutes de la liste HG ; libellés : etatLabel du catalogue).
 const ETAT_TONE: Record<string, string> = { 'FAT ok': 'var(--abi-green)', 'SAT ok': 'var(--abi-green)', 'A coder': 'var(--abi-orange-text)' };
 
 export function Palette({ cat, current, onCurrent, onPlace, onSymbols }: { cat: Catalogue; current: string; onCurrent: (code: string) => void; onPlace: (code: string) => void; onSymbols: () => void }) {
@@ -24,22 +49,31 @@ export function Palette({ cat, current, onCurrent, onPlace, onSymbols }: { cat: 
   const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const codes = principals(cat).filter((k) => !q || norm(k + ' ' + cat.hgTypes[k].label + ' ' + cat.hgTypes[k].labelEn).includes(norm(q)));
   const groups = GROUP_ORDER.filter((g) => codes.some((k) => symbolOf(k).group === g));
+  const cur = cat.hgTypes[current];
   return (
     <aside style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid var(--surface-panel-header)', background: 'var(--surface-page)' }}>
-      <PanelHead icon="layers" title="HG principaux" right={<button type="button" title="Planche des symboles" aria-label="Planche des symboles" onClick={onSymbols} className="abi-btn" style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex' }}><Icon name="grid" size={20} /></button>} />
+      <PanelHead icon="layers" title={tx(L.title)} right={<button type="button" title={tx(L.sheet)} aria-label={tx(L.sheet)} onClick={onSymbols} className="abi-btn" style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex' }}><Icon name="grid" size={20} /></button>} />
       <div style={{ padding: 8, borderBottom: '1px solid var(--border-divider)' }}>
+        {/* Sous-titre en mots simples, terme technique en petit ; l'en-tête garde le titre court « Bibliothèque ». */}
+        <div style={{ margin: '0 2px 6px', font: '400 12px/1.3 var(--font-sans)', color: 'var(--text-secondary)' }}>
+          {tx(L.subtitle)}
+          <Abbr>HG</Abbr>
+        </div>
         <div style={{ position: 'relative' }}>
-          <input aria-label="Chercher un HG principal" placeholder="Chercher (code, libellé)…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inputStyle, paddingLeft: 30 }} />
+          <input aria-label={tx(L.searchAria)} placeholder={tx(L.searchPh)} value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inputStyle, paddingLeft: 30 }} />
           <Icon name="search" size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 8, top: 7 }} />
         </div>
       </div>
       <div style={{ overflow: 'auto', flex: 1, paddingBottom: 12 }}>
         {groups.map((g) => (
           <section key={g}>
-            <div style={{ padding: '10px 10px 4px', font: '700 11px var(--font-sans)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{g}</div>
+            <div style={{ padding: '10px 10px 4px', font: '700 11px var(--font-sans)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{groupLabel(g)}</div>
             {codes.filter((k) => symbolOf(k).group === g).map((k) => {
               const d = cat.hgTypes[k];
               const on = k === current;
+              const name = hgLabel(d);
+              // Infobulle : nom dans la langue courante, puis l'autre nom de la liste HG s'il diffère.
+              const alt = getLang() === 'en' ? d.label : d.labelEn;
               return (
                 <div
                   key={k}
@@ -51,7 +85,7 @@ export function Palette({ cat, current, onCurrent, onPlace, onSymbols }: { cat: 
                   }}
                   onClick={() => onCurrent(k)}
                   onDoubleClick={() => onPlace(k)}
-                  title={`${d.label} — ${d.labelEn}\nÉtat software : ${d.etat ?? '—'} · ID WinCC : ${d.idWinCC ?? '—'}\nGlisser sur le PID pour poser · clic : HG0 des gestes « + » · double-clic : poser au centre`}
+                  title={`${name}${alt && alt !== name ? ' — ' + alt : ''}\n${tx(L.status)} ${etatLabel(d.etat) || '—'} · ${tx(L.wincc)} ${d.idWinCC ?? '—'}\n${tx(L.rowHelp)}`}
                   className="abi-row"
                   style={{
                     display: 'flex', alignItems: 'center', gap: 4, margin: '0 6px 2px', padding: '1px 6px 1px 0',
@@ -61,10 +95,10 @@ export function Palette({ cat, current, onCurrent, onPlace, onSymbols }: { cat: 
                 >
                   <Glyph hg0={k} />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ font: '400 13px/1.2 var(--font-sans)', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
+                    <div style={{ font: '400 13px/1.2 var(--font-sans)', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                     <div style={{ font: '400 11px var(--font-tag)', color: 'var(--text-muted)', display: 'flex', gap: 6 }}>
                       <span style={{ color: '#ddd' }}>{k}</span>
-                      <span style={{ color: ETAT_TONE[d.etat ?? ''] ?? 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>{d.etat ?? ''}</span>
+                      <span style={{ color: ETAT_TONE[d.etat ?? ''] ?? 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>{etatLabel(d.etat)}</span>
                     </div>
                   </div>
                   {on && <Icon name="plus" size={16} color="var(--abi-green)" />}
@@ -73,25 +107,31 @@ export function Palette({ cat, current, onCurrent, onPlace, onSymbols }: { cat: 
             })}
           </section>
         ))}
-        <div style={{ padding: '14px 10px 4px', font: '700 11px var(--font-sans)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Dessin</div>
+        <div style={{ padding: '14px 10px 4px', font: '700 11px var(--font-sans)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{tx(L.drawing)}</div>
         <div
           draggable
           onDragStart={(e) => e.dataTransfer.setData('text/x-chute', '1')}
-          title="Goulotte de tri — objet de dessin (statut dans le pivot à confirmer)"
+          title={tx(L.chuteHelp)}
           className="abi-row"
           style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '0 6px', padding: '1px 6px 1px 0', background: 'var(--surface-nav)', border: '1px solid transparent', cursor: 'grab' }}
         >
           <svg width={72} height={44} viewBox="-36 -22 72 44" aria-hidden="true">
             <g transform="scale(0.4)">
-              <ChuteShape x={0} y={0} label="Goulotte" />
+              <ChuteShape x={0} y={0} label={tx(L.chuteShort)} />
             </g>
           </svg>
-          <div style={{ font: '400 13px var(--font-sans)' }}>Goulotte de tri</div>
+          <div style={{ font: '400 13px var(--font-sans)' }}>{tx(L.chute)}</div>
         </div>
       </div>
       <Legend />
       <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border-divider)', font: '400 12px/1.4 var(--font-sans)', color: 'var(--text-muted)' }}>
-        <span style={{ color: 'var(--abi-green)' }}>+</span> sur un EQ pose : <strong style={{ color: '#fff', fontWeight: 400 }}>{current} — {cat.hgTypes[current]?.label}</strong>
+        <span style={{ color: 'var(--abi-green)' }}>+</span> {tx(L.plusOn)}
+        <Abbr>EQ</Abbr> {tx(L.plusPlaces)}{' '}
+        {/* Libellé puis code HG en petit, comme la notification de la planche. */}
+        <strong style={{ color: '#fff', fontWeight: 400 }}>
+          {cur ? hgLabel(cur) : ''}
+          <Abbr>{current}</Abbr>
+        </strong>
       </div>
     </aside>
   );

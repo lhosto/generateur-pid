@@ -78,7 +78,8 @@ export function Button(props: {
   );
 }
 
-export function PanelHead({ icon, title, right }: { icon?: string; title: string; right?: ReactNode }) {
+// Titres et libellés en ReactNode : ils peuvent porter le terme technique en petit (<Term/>, <Abbr/> de i18n).
+export function PanelHead({ icon, title, right }: { icon?: string; title: ReactNode; right?: ReactNode }) {
   return (
     <header style={{ display: 'flex', alignItems: 'center', height: 'var(--panel-head-h)', background: 'var(--surface-panel-header)', flex: 'none' }}>
       {icon && (
@@ -92,7 +93,7 @@ export function PanelHead({ icon, title, right }: { icon?: string; title: string
   );
 }
 
-export function SectionHead({ title, right }: { title: string; right?: ReactNode }) {
+export function SectionHead({ title, right }: { title: ReactNode; right?: ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', height: 32, padding: '0 10px', background: 'var(--surface-panel-header)', margin: '18px 0 8px' }}>
       <span style={{ font: '700 13px var(--font-sans)', textTransform: 'uppercase', color: '#fff' }}>{title}</span>
@@ -113,7 +114,7 @@ export const inputStyle: CSSProperties = {
   outline: 'none',
 };
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
+export function Field({ label, children, hint }: { label: ReactNode; children: ReactNode; hint?: ReactNode }) {
   return (
     <label style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: 10, margin: '6px 10px' }}>
       <span style={{ font: '700 13px var(--font-sans)', color: '#9aa49f' }}>{label}</span>

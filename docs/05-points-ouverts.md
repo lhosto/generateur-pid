@@ -19,3 +19,7 @@
 | Goulotte de tri | Simple objet de dessin, ou EQ du pivot ? | | |
 | Police des repères sur le PID | IBM Plex Mono (design SCADA 2026) ou police réelle d'Unified | | |
 | Colonne « A saisir » de la liste HG | Sens à préciser (non utilisée par l'éditeur) | | |
+| Textes de l'éditeur pour l'opérateur | Français en mots simples, suivi en petit du terme technique (Équipement EQ, Canal CH, Matériel générique HG, Matériel spécifique HS, Fonction FU) ; anglais prêt (bascule FR/EN). | Décidé | 20/10/2026 |
+| Vocabulaire opérateur à valider | « Matériel principal » pour HG0 ; « début de flux » pour first channel ; « sans action » pour no action ; « Sortie non reliée » ; « Automate (CPU) » ; « pivot » encore visible (« Enregistrer le pivot ») ; « À coder » accentué alors que la liste dit « A coder » | | |
+| Vocabulaire anglais à valider | P&ID (et non PID) ; Customer tag ; Equipment item(s) ; Main Hardware Generic ; Unconnected output ; Start of flow ; Sorting chute ; Draft (esquisse) ; placeholder (fictif) | | |
+| Libellés anglais du catalogue | Les HS, noms de consignes et options du bloc EQ n'ont pas de champ anglais dans les sources ; l'éditeur garde une petite table anglaise provisoire pour les 4 options | | |

@@ -1,6 +1,7 @@
 // Types du catalogue intégré à l'éditeur. La liste des HG vient de l'export SharePoint
 // (kit/sharepoint/Hardware Generic.csv, via scripts/catalogue.mjs) ; HS, interface du bloc EQ et
 // préfixes de repère sont encore fictifs (src/fictif/complements.fictif.json).
+import { tx, type Entry } from '../i18n';
 
 export type HgRole = 'matiere' | 'moteur' | 'commande' | 'protection' | 'proximite' | 'securite';
 
@@ -73,11 +74,27 @@ export interface Catalogue {
   baseDefaults: BaseSettings;
 }
 
+const NO_CATALOGUE: Entry = { fr: 'Catalogue absent du fichier HTML', en: 'Catalogue missing from the HTML file' };
+
 /** Lit le catalogue embarqué dans la page (bloc <script id="catalogue">). */
 export function readEmbeddedCatalogue(): Catalogue {
   const el = document.getElementById('catalogue');
-  if (!el || !el.textContent) throw new Error('Catalogue absent du fichier HTML');
+  if (!el || !el.textContent) throw new Error(tx(NO_CATALOGUE));
   return JSON.parse(el.textContent) as Catalogue;
 }
 
 export const principals = (cat: Catalogue) => Object.keys(cat.hgTypes).filter((k) => cat.hgTypes[k].principal);
+
+/** États logiciels de la liste HG : la valeur de la liste reste la clé, seul l'affichage est traduit. */
+const ETAT_LABELS: Record<string, Entry> = {
+  'A coder': { fr: 'À coder', en: 'To be coded' },
+  'Programmation en cours': { fr: 'Programmation en cours', en: 'Programming in progress' },
+  'AF/AO en cours': { fr: 'AF/AO en cours', en: 'AF/AO in progress' },
+  'FAT en cours': { fr: 'FAT en cours', en: 'FAT in progress' },
+  'FAT ok': { fr: 'FAT ok', en: 'FAT ok' },
+  'SAT ok': { fr: 'SAT ok', en: 'SAT ok' },
+  NA: { fr: 'NA', en: 'N/A' },
+};
+
+/** Libellé affiché d'un état logiciel (la valeur brute si elle n'est pas traduite, '' si absente). */
+export const etatLabel = (e: string | null | undefined) => (e && ETAT_LABELS[e] ? tx(ETAT_LABELS[e]) : e ?? '');

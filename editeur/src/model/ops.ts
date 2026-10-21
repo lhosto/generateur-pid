@@ -1,6 +1,6 @@
 // Opérations pures sur le pivot : chaque fonction rend un nouveau pivot (annuler/rétablir par copie).
 import type { BaseSettings, Catalogue } from './catalogue';
-import { boxAt, eqBox, flowVec, hg0Of, opposite, overlaps, sizeOf, snap, type Box } from './geometry';
+import { boxAt, eqBox, flowVec, hg0Of, opposite, overlaps, sideOffset, sizeOf, snap, type Box } from './geometry';
 import { PIVOT_FORMAT, uid, type Chute, type Dir, type Eq, type Flow, type Link, type OutputRef, type Pivot } from './pivot';
 import {
   defaultOptions, defaultSetpoints, defaultStack, chainOf, hgDef, proximityOf, makeHg,
@@ -8,6 +8,7 @@ import {
 } from './rules';
 import { symbolOf } from './symbols';
 
+/** Pivot vide. Le nom est un titre libre (modifiable dans l'en-tête) : l'interface passe sa traduction. */
 export function emptyPivot(cat: Catalogue, name = 'Nouveau site'): Pivot {
   return {
     format: PIVOT_FORMAT,
@@ -92,8 +93,7 @@ export function placeNext(p: Pivot, src: Eq, dir: Dir, hg0: string, ch: number):
   const dist = (vx !== 0 ? sb.w / 2 + size.w / 2 : sb.h / 2 + size.h / 2) + 60;
   const others: Box[] = p.equipments.map((e) => eqBox(e));
   const step = vx !== 0 ? Math.max(60, size.h + 30) : Math.max(80, size.w + 30);
-  const n = src.channels.length;
-  const chOffset = n > 1 ? ((ch - 1) - (n - 1) / 2) * step : 0;
+  const chOffset = sideOffset(src, f, ch);
   for (let k = 0; k < 12; k++) {
     const off = chOffset + (k === 0 ? 0 : (k % 2 ? 1 : -1) * Math.ceil(k / 2) * step);
     const x = snap(src.x + vx * dist + (vx === 0 ? off : 0));
@@ -250,8 +250,11 @@ export function duplicate(cat: Catalogue, p: Pivot, eqIds: string[]): { p: Pivot
   return { p: touch(next), ids };
 }
 
+/** Libellé enregistré d'une goulotte neuve (donnée, en français) ; le canevas le traduit à l'affichage. */
+export const DEFAULT_CHUTE_LABEL = 'Goulotte de tri';
+
 export function addChute(p: Pivot, x: number, y: number): { p: Pivot; id: string } {
-  const c: Chute = { id: uid('gt'), x: snap(x), y: snap(y), label: 'Goulotte de tri' };
+  const c: Chute = { id: uid('gt'), x: snap(x), y: snap(y), label: DEFAULT_CHUTE_LABEL };
   return { p: touch({ ...p, chutes: [...p.chutes, c] }), id: c.id };
 }
 

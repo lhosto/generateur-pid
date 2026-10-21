@@ -84,7 +84,7 @@
 --ease-std:cubic-bezier(.2,0,0,1); 
 }
 :root{
---font-sans:Arial,"Helvetica Neue",Helvetica,sans-serif;
+--font-sans:"Inter Tight Variable","Inter Tight",Arial,"Helvetica Neue",sans-serif;
 --font-serif:"Times New Roman",Times,serif;
 --font-mono:"Roboto Mono",Consolas,monospace;
 --fw-regular:400; 
@@ -151,3 +151,7 @@ input,select{font:400 14px var(--font-sans)}
 .abi-tr:hover td{background:#444}
 .abi-link:hover{text-decoration:underline}
 button:focus-visible,input:focus-visible,select:focus-visible,[draggable]:focus-visible{outline:2px solid var(--abi-green);outline-offset:1px}
+/* Terme technique en petit, après le libellé en mots simples (Matériel générique · HG).
+   Couleur du texte qui l'entoure, atténuée : reste lisible sur les en-têtes, le bouton vert et les
+   notifications ; taille plancher de 10 px. */
+.term{font-weight:600;font-size:max(.75em,10px);line-height:1;font-family:var(--font-tag);letter-spacing:.04em;color:inherit;opacity:.78;margin-left:.45em;vertical-align:.06em;text-transform:none}

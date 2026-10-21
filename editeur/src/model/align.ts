@@ -58,22 +58,14 @@ export function distribute(items: Item[], axis: Axis): Pos {
   return out;
 }
 
-/** Guides magnétiques : aligne le centre déplacé sur le centre d'un autre objet proche. */
-export function guideSnap(moving: { cx: number; cy: number }, others: Box[], tol = 6): { dx: number; dy: number; gx?: number; gy?: number } {
-  let best = { dx: 0, dy: 0 } as { dx: number; dy: number; gx?: number; gy?: number };
-  let bx = tol + 1;
-  let by = tol + 1;
-  for (const o of others) {
-    const ex = o.cx - moving.cx;
-    const ey = o.cy - moving.cy;
-    if (Math.abs(ex) < bx) {
-      bx = Math.abs(ex);
-      best = { ...best, dx: ex, gx: o.cx };
-    }
-    if (Math.abs(ey) < by) {
-      by = Math.abs(ey);
-      best = { ...best, dy: ey, gy: o.cy };
-    }
-  }
-  return best;
+/** Guides magnétiques : rapproche le centre déplacé de la valeur candidate la plus proche, par axe. */
+export function guideSnap(moving: { cx: number; cy: number }, xs: number[], ys: number[], tol = 6): { dx: number; dy: number; gx?: number; gy?: number } {
+  const near = (v: number, list: number[]) => {
+    let best: number | undefined;
+    for (const c of list) if (Math.abs(c - v) <= tol && (best === undefined || Math.abs(c - v) < Math.abs(best - v))) best = c;
+    return best;
+  };
+  const gx = near(moving.cx, xs);
+  const gy = near(moving.cy, ys);
+  return { dx: gx === undefined ? 0 : gx - moving.cx, dy: gy === undefined ? 0 : gy - moving.cy, gx, gy };
 }

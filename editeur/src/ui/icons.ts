@@ -1,5 +1,6 @@
 // Icônes ABI (AbiDesign/assets/icons, 24×24, trait 1.5, currentColor) — métadonnées retirées.
 export const ICONS: Record<string, string> = {
+  "straighten": "<path d=\"M3 12h18\"></path><path d=\"M3 6h6l3 6\" stroke-dasharray=\"2 2\"></path><path d=\"M17 9l3 3-3 3\"></path>",
   "workflow": "<path d=\"M3 3h7v7H3z\"></path><path d=\"M14 14h7v7h-7z\"></path><path d=\"M6.5 10v4.5a3 3 0 0 0 3 3H14\"></path>",
   "link": "<path d=\"M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7\"></path><path d=\"M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7\"></path>",
   "octagon-x": "<path d=\"M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z\"></path><path d=\"M15 9l-6 6\"></path><path d=\"M9 9l6 6\"></path>",

@@ -1,6 +1,7 @@
 // Règles du standard appliquées par l'éditeur. Elles viennent du catalogue (liste HG : supérieurs,
 // options) ; celles marquées PROPOSITION sont à confirmer par Alex (docs/05-points-ouverts.md).
-import type { BaseSettings, Catalogue, HgTypeDef } from './catalogue';
+import { getLang, tx } from '../i18n';
+import type { BaseSettings, Catalogue, EqOptionDef, HgTypeDef, HsDef } from './catalogue';
 import { hg0Of } from './geometry';
 import { uid, type Dir, type Eq, type Hg, type Pivot, type Setpoint } from './pivot';
 
@@ -8,9 +9,41 @@ export const MAX = { channels: 3, outputs: 6, setpoints: 4, hg: 23 };
 
 const PROXIMITY_ROLES = new Set(['proximite', 'securite']);
 
+// Textes vus par l'opérateur. Le français est la langue par défaut : rules.test.ts vérifie ces libellés.
+// Les noms TIA (24A_DRIV01), codes HG (KM), repères et numéros de sortie (S1) restent tels quels.
+// « [HS] » = terme technique affiché en petit après le mot simple (i18n.rich ; i18n.plain dans un title).
+const L = {
+  unknownHg: { fr: (t: string) => `Matériel générique (HG) inconnu : ${t}`, en: (t: string) => `Unknown Hardware Generic (HG): ${t}` },
+  kmNoReverse: { fr: 'Commande par contacteur (KM) : marche arrière impossible', en: 'Contactor control (KM): reverse not possible' },
+  reverseOff: { fr: "Marche arrière non autorisée (option de l'équipement [EQ])", en: 'Reverse not allowed (Equipment [EQ] option)' },
+  negative: { fr: 'négative', en: 'negative' },
+  positive: { fr: 'positive', en: 'positive' },
+  forward: { fr: 'avant', en: 'forward' },
+  reverse: { fr: 'arrière', en: 'reverse' },
+  noRepere: { fr: 'Repère client manquant', en: 'Customer tag missing' },
+  dupRepere: { fr: (r: string) => 'Repère client en double : ' + r, en: (r: string) => 'Duplicate customer tag: ' + r },
+  noHs: { fr: (n: string) => `${n} : matériel spécifique [HS] à choisir`, en: (n: string) => `${n}: Hardware Specific [HS] not selected` },
+  tooManyHg: { fr: (n: number) => `Plus de ${n} matériels génériques [HG]`, en: (n: number) => `More than ${n} Hardware Generic items [HG]` },
+  kmReverse: { fr: 'Sortie marche arrière avec une commande KM', en: 'Reverse output with KM control' },
+  // HS provisoire du catalogue (scripts/catalogue.mjs) : affiché sous un en-tête « Matériel spécifique · HS ».
+  hsTbd: { fr: 'À définir', en: 'To be defined' },
+};
+
+// Anglais des options du bloc EQ, en attendant un labelEn dans le catalogue (sinon : libellé français).
+// Partagé par la fiche et le rapport de génération, pour qu'ils nomment l'option de la même façon.
+const OPTION_EN: Record<string, string> = {
+  reverseAllowed: 'Allow reverse',
+  bypassType: 'Bypass type (direction set at commissioning)',
+  bypassInterlocksAtStart: 'Bypass interlocks at start-up',
+  startDelay: 'Start-up delay',
+};
+
+/** Libellé affiché d'une option du bloc EQ : celui du catalogue, ou sa traduction anglaise. */
+export const optionLabel = (o: Pick<EqOptionDef, 'id' | 'label'>) => (getLang() === 'en' && OPTION_EN[o.id]) || o.label;
+
 export function hgDef(cat: Catalogue, type: string): HgTypeDef {
   const d = cat.hgTypes[type];
-  if (!d) throw new Error('Type de HG inconnu : ' + type);
+  if (!d) throw new Error(tx(L.unknownHg, type));
   return d;
 }
 
@@ -89,10 +122,10 @@ export function alternativesAt(cat: Catalogue, eq: Eq, i: number): string[] {
 
 export const isKM = (eq: Eq) => eq.hg.some((h) => h.type === 'KM');
 
-/** Marche arrière : grisée si la commande est un KM, sinon soumise à l'option du bloc EQ. */
+/** Marche arrière : grisée si la commande est un KM, sinon soumise à l'option du bloc EQ (texte à marqueurs, voir L). */
 export function reverseBlocked(eq: Eq): string | null {
-  if (isKM(eq)) return 'Commande par contacteur (KM) : marche arrière impossible';
-  if (!eq.options.reverseAllowed) return "Marche arrière non autorisée (option de l'EQ)";
+  if (isKM(eq)) return tx(L.kmNoReverse);
+  if (!eq.options.reverseAllowed) return tx(L.reverseOff);
   return null;
 }
 
@@ -113,11 +146,12 @@ export function canAddOutput(eq: Eq, ch: number, dir: Dir): boolean {
 
 export const canAddChannel = (eq: Eq) => eq.channels.length < MAX.channels;
 
-export const polarity = (num: number) => (num === 1 ? 'négative' : 'positive');
+export const polarity = (num: number) => tx(num === 1 ? L.negative : L.positive);
 export const pad2 = (n: number) => String(n).padStart(2, '0');
 
+/** Étiquette d'une sortie : repère · CH01 · S1 · sens · polarité (CH01 et S1 sont des noms, non traduits). */
 export function outputLabel(eq: Eq, ch: number, dir: Dir, num: number): string {
-  return `${eq.repere || '?'} · CH${pad2(ch)} · S${num} · ${dir === 'avant' ? 'avant' : 'arrière'} · ${polarity(num)}`;
+  return `${eq.repere || '?'} · CH${pad2(ch)} · S${num} · ${tx(dir === 'avant' ? L.forward : L.reverse)} · ${polarity(num)}`;
 }
 
 /** First channel : coché automatiquement si aucune sortie n'arrive dans le canal. */
@@ -140,6 +174,9 @@ export function hsName(eq: Eq, hg: Hg): string | null {
   return hg.hs ? `${hgName(eq, hg)}_${hg.hs}` : null;
 }
 
+/** Libellé affiché d'un HS du catalogue : le HS provisoire « HS à définir » passe en mots simples. */
+export const hsLabel = (h: Pick<HsDef, 'label'>) => (h.label === 'HS à définir' ? tx(L.hsTbd) : h.label);
+
 export function defaultSetpoints(cat: Catalogue, hg0: string): Setpoint[] {
   return (hgDef(cat, hg0).setpoints ?? []).slice(0, MAX.setpoints).map((s) => ({ name: s.name, unit: s.unit, value: s.default }));
 }
@@ -150,17 +187,17 @@ export function defaultOptions(cat: Catalogue): Record<string, boolean | number>
   return o;
 }
 
-/** Raisons pour lesquelles un EQ n'est pas encore utilisable par le générateur. */
+/** Raisons pour lesquelles un EQ n'est pas encore utilisable par le générateur (textes à marqueurs, voir L). */
 export function incompleteReasons(cat: Catalogue, p: Pivot, eq: Eq): string[] {
   const r: string[] = [];
-  if (!eq.repere.trim()) r.push('Repère client manquant');
-  else if (p.equipments.some((o) => o.id !== eq.id && o.repere === eq.repere)) r.push('Repère client en double : ' + eq.repere);
+  if (!eq.repere.trim()) r.push(tx(L.noRepere));
+  else if (p.equipments.some((o) => o.id !== eq.id && o.repere === eq.repere)) r.push(tx(L.dupRepere, eq.repere));
   for (const h of eq.hg) {
     const d = hgDef(cat, h.type);
-    if (d.hs.length > 0 && !h.hs) r.push(`${hgName(eq, h)} : HS à choisir`);
+    if (d.hs.length > 0 && !h.hs) r.push(tx(L.noHs, hgName(eq, h)));
   }
-  if (eq.hg.length > MAX.hg) r.push(`Plus de ${MAX.hg} HG`);
-  if (isKM(eq) && eq.channels.some((c) => c.outputs.some((o) => o.dir === 'arriere'))) r.push('Sortie marche arrière avec une commande KM');
+  if (eq.hg.length > MAX.hg) r.push(tx(L.tooManyHg, MAX.hg));
+  if (isKM(eq) && eq.channels.some((c) => c.outputs.some((o) => o.dir === 'arriere'))) r.push(tx(L.kmReverse));
   return r;
 }
 

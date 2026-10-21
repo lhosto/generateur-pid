@@ -12,6 +12,7 @@
     "catalogue": "node scripts/catalogue.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/inter-tight": "5.1.1",
     "@fontsource/ibm-plex-mono": "5.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1"

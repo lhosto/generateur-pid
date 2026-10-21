@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import catJson from '../catalogue.json';
 import { siteTest } from '../fictif/siteTest.fictif';
+import { setLang } from '../i18n';
 import { align, distribute } from './align';
 import { principals, type Catalogue } from './catalogue';
 import { SYMBOLS } from './symbols';
+import { straighten } from './straighten';
 import { boxAt } from './geometry';
 import { addChannel, addEq, addOutput, addOutputWithNext, connect, emptyPivot, findEq, removeChannel, setChainType } from './ops';
 import { routeAll } from './route';
@@ -15,6 +17,9 @@ const cat = catJson as unknown as Catalogue;
 const base = cat.baseDefaults;
 const drivBase = { ...base, command: 'DRIV' as const };
 const types = (hg0: string, b = base) => defaultStack(cat, b, hg0).map((h) => h.type);
+
+// Les libellés vérifiés sont les textes français : la langue ne dépend pas d'un éventuel stockage local.
+beforeAll(() => setLang('fr'));
 
 describe('catalogue (liste HG réelle)', () => {
   it('reprend les 48 HG principaux, chacun avec un symbole', () => {
@@ -81,6 +86,19 @@ describe('canaux et sorties', () => {
     p = removeChannel(p, id, 2);
     expect(p.links[0].from.ch).toBe(2);
   });
+  it('retirer le dernier canal supprime ses sorties et les liens qui y arrivent, jamais le dernier canal restant', () => {
+    let { p, id } = addEq(cat, emptyPivot(cat), 'OPSO', 300, 300, { channels: 2 });
+    const up = addEq(cat, p, 'BELT', 100, 300);
+    const down = addEq(cat, up.p, 'BELT', 500, 300);
+    p = connect(down.p, { eq: up.id, ch: 1, dir: 'avant', num: 1 }, { eq: id, ch: 2 });
+    p = connect(p, { eq: id, ch: 2, dir: 'avant', num: 1 }, { eq: down.id, ch: 1 });
+    p = connect(p, { eq: id, ch: 1, dir: 'avant', num: 1 }, { eq: down.id, ch: 1 });
+    p = removeChannel(p, id, 2);
+    expect(findEq(p, id)!.channels).toHaveLength(1);
+    expect(p.links.map((l) => [l.from.eq, l.from.ch, l.to.eq])).toEqual([[id, 1, down.id]]);
+    expect(findEq(p, up.id)!.channels[0].outputs).toHaveLength(1); // la sortie amont reste, libre
+    expect(removeChannel(p, id, 1)).toBe(p);
+  });
 });
 
 describe('nommage et contrôles', () => {
@@ -131,5 +149,63 @@ describe('alignement', () => {
     const gap1 = r.b.x - 31 - (r.a.x + 28);
     const gap2 = r.c.x - 19 - (r.b.x + 31);
     expect(Math.abs(gap1 - gap2)).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('traits alignés (axes de canal)', () => {
+  const linked = (h0a: string, a: [number, number], h0b: string, b: [number, number], o: { chA?: number; chB?: number; nB?: number } = {}) => {
+    const A = addEq(cat, emptyPivot(cat), h0a, a[0], a[1], { repere: 'AAa' });
+    const B = addEq(cat, A.p, h0b, b[0], b[1], { repere: 'BBa', channels: o.nB ?? 1 });
+    const p = connect(B.p, { eq: A.id, ch: o.chA ?? 1, dir: 'avant', num: 1 }, { eq: B.id, ch: o.chB ?? 1 });
+    return { p, a: A.id, b: B.id };
+  };
+  it('redresse deux EQ presque alignés : le lien devient droit', () => {
+    const { p } = linked('BELT', [100, 100], 'BELT', [300, 110]);
+    expect(routeAll(p).links[0].points.length).toBeGreaterThan(2);
+    const q = straighten(p);
+    expect(new Set(q.equipments.map((e) => e.y)).size).toBe(1);
+    expect(routeAll(q).links[0].points).toHaveLength(2);
+  });
+  it('aligne un tapis sur l’axe du canal 1 d’un trieur tricanal, le trieur ne bouge pas', () => {
+    const { p, a, b } = linked('BELT', [300, 290], 'OPSO', [500, 300], { chB: 1, nB: 3 });
+    const q = straighten(p);
+    expect(findEq(q, b)!.y).toBe(300);
+    expect(findEq(q, a)!.y).toBe(280);
+    const pts = routeAll(q).links[0].points;
+    expect(pts).toHaveLength(2);
+    expect(pts[0][1]).toBe(280);
+  });
+  it('ne touche pas aux liens franchement décalés ni aux EQ hors sélection', () => {
+    const { p } = linked('BELT', [100, 100], 'BELT', [300, 260]);
+    expect(straighten(p)).toBe(p);
+    const n = linked('BELT', [100, 100], 'BELT', [300, 110]);
+    expect(straighten(n.p, new Set([n.a])).equipments.find((e) => e.id === n.a)!.y).toBe(110);
+  });
+  it('le geste « + » pose l’EQ suivant sur l’axe du canal', () => {
+    const t = addEq(cat, emptyPivot(cat), 'OPSO', 300, 300, { channels: 3 });
+    const r = addOutputWithNext(cat, t.p, t.id, 3, 'avant', 'BELT');
+    expect(findEq(r.p, r.id!)!.y).toBe(320);
+    expect(routeAll(r.p).links[0].points).toHaveLength(2);
+  });
+  it('site de test : liens d’une même rangée droits', () => {
+    const p = siteTest(cat);
+    const id = (rep: string) => p.equipments.find((e) => e.repere === rep)!.id;
+    const straightPairs = [['08Aa', '57Ma'], ['08Ac', '36Ra'], ['08Fd', '13Ca'], ['13Ca', '08Fe'], ['42Fb', '08Fa']];
+    for (const [f, t] of straightPairs) {
+      const l = routeAll(p).links.find((x) => x.link.from.eq === id(f) && x.link.to.eq === id(t))!;
+      expect([f, t, l.points.length]).toEqual([f, t, 2]);
+    }
+  });
+});
+
+describe('redresser après un glisser', () => {
+  it('un EQ décalé revient sur la rangée, la rangée ne bouge pas', () => {
+    const p0 = siteTest(cat);
+    const a = p0.equipments.find((e) => e.repere === '08Aa')!;
+    const moved = { ...p0, equipments: p0.equipments.map((e) => (e.id === a.id ? { ...e, y: e.y + 30 } : e)) };
+    const q = straighten(moved);
+    expect(findEq(q, a.id)!.y).toBe(a.y);
+    const others = q.equipments.filter((e) => e.id !== a.id);
+    expect(others.every((e) => e.y === p0.equipments.find((o) => o.id === e.id)!.y)).toBe(true);
   });
 });

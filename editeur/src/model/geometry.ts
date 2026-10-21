@@ -5,8 +5,11 @@ import { BASE_SIZE, symbolOf, type Base } from './symbols';
 
 export const SCREEN = { w: 1920, h: 1080 };
 export const GRID = 10;
-/** Épaisseur ajoutée par canal supplémentaire, perpendiculairement au flux. */
-export const CHANNEL_STEP = 10;
+/**
+ * Écart entre les axes de deux canaux voisins. Multiple de la grille : les axes tombent sur la grille,
+ * ce qui permet des liens parfaitement droits d'un canal à l'autre.
+ */
+export const CH_PITCH = 20;
 export const CHUTE_SIZE = { w: 22, h: 104 };
 
 export interface Box {
@@ -27,7 +30,7 @@ export const baseOf = (eq: Pick<Eq, 'hg'>): Base => symbolOf(hg0Of(eq)).base;
 
 export function sizeOf(base: Base, channels: number, flow: Flow): { w: number; h: number } {
   const [w, h] = BASE_SIZE[base];
-  const extra = Math.max(0, channels - 1) * CHANNEL_STEP;
+  const extra = Math.max(0, channels - 1) * CH_PITCH;
   return isHorizontal(flow) ? { w, h: h + extra } : { w: w + extra, h };
 }
 
@@ -38,6 +41,20 @@ export function boxAt(cx: number, cy: number, w: number, h: number): Box {
 export function eqBox(eq: Eq): Box {
   const { w, h } = sizeOf(baseOf(eq), eq.channels.length, eq.flow);
   return boxAt(eq.x, eq.y, w, h);
+}
+
+/** Décalage de l'axe du canal ch par rapport au centre de l'EQ, perpendiculairement au flux. */
+export function channelOffset(n: number, ch: number): number {
+  return (ch - 1 - (n - 1) / 2) * CH_PITCH;
+}
+
+/**
+ * Décalage, le long d'un côté, du point d'accroche d'un canal : sur les côtés perpendiculaires au flux
+ * (entrée / sortie matière), chaque canal a son axe ; sur les autres côtés, le milieu.
+ */
+export function sideOffset(eq: Pick<Eq, 'flow' | 'channels'>, side: Flow, ch: number): number {
+  const n = eq.channels.length;
+  return n > 1 && isHorizontal(side) === isHorizontal(eq.flow) ? channelOffset(n, ch) : 0;
 }
 
 export function flowVec(f: Flow): [number, number] {
