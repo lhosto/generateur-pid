@@ -29,3 +29,6 @@
 | Onglet des canaux « − n canaux + » | Au survol : au-dessus de l'équipement en flux horizontal ; à droite en flux vertical (le haut et le bas portent alors les sorties et les arrivées) | | |
 | Menu du « + » d'une sortie | Convoyeur en tête par défaut, puis le dernier choix, puis « Autre équipement… » (planche complète) | | |
 | Doublons de repère | Repère client et repère Aktid contrôlés sans tenir compte des majuscules ni des espaces (08aa = 08Aa) ; « Dupliquer » vide le repère Aktid de la copie | | |
+| Sortie en attente de raccordement | Tout nouvel équipement (sauf « sans action ») et tout nouveau canal arrive avec sa sortie 1 marche avant déclarée, libre, en orange ; clic dessus (« + » au survol) = choisir l'équipement à raccorder ; Suppr = la supprimer | Décidé | 21/10/2026 |
+| Étiquette courte des sorties | Un canal, une sortie → rien ; un canal, plusieurs sorties → « 2 » ; une sortie par canal → numéro de canal ; sinon « 1.2 ». « AR » ajouté en marche arrière | Décidé | 21/10/2026 |
+| Taille du convoyeur | Réduite de 56×28 à 48×24 (32×48 à la verticale) | | |

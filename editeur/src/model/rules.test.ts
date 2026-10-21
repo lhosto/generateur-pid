@@ -9,7 +9,7 @@ import { straighten } from './straighten';
 import { boxAt, eqBox } from './geometry';
 import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum } from './ops';
 import type { Pivot } from './pivot';
-import { loopLinks, routeAll } from './route';
+import { loopLinks, routeAll, shortTag } from './route';
 import {
   canAddOutput, defaultStack, hgName, hsName, incompleteReasons, isFirstChannel, MAX, nextOutputNum, reverseBlocked, suggestRepere,
 } from './rules';
@@ -290,5 +290,60 @@ describe('numéros de sortie', () => {
     const ref = p.links.find((l) => l.to.eq === ids[2])!.from;
     const q = setOutputNum(p, ref, 1);
     expect(ids.map((id) => numTo(q, id))).toEqual([2, 3, 1]);
+  });
+});
+
+describe('côtés imposés par le flux', () => {
+  it('flux vers le bas : la marche arrière part par le haut, la marche avant par le bas', () => {
+    let p = emptyPivot(cat);
+    const a = addEq(cat, p, 'BELT', 300, 300, { flow: 'S', options: { reverseAllowed: true } });
+    p = setChainType(cat, a.p, a.id, 2, 'DRIV');
+    const up = addEq(cat, p, 'BELT', 500, 100);
+    const down = addEq(cat, up.p, 'BELT', 500, 500);
+    p = connect(down.p, { eq: a.id, ch: 1, dir: 'arriere', num: 1 }, { eq: up.id, ch: 1 });
+    p = connect(p, { eq: a.id, ch: 1, dir: 'avant', num: 1 }, { eq: down.id, ch: 1 });
+    const box = eqBox(findEq(p, a.id)!);
+    const r = routeAll(p).links;
+    const start = (to: string) => r.find((l) => l.link.to.eq === to)!.points[0];
+    expect(start(up.id)[1]).toBe(box.y0);
+    expect(start(down.id)[1]).toBe(box.y1);
+  });
+});
+
+describe('sortie 1.1 en attente et étiquettes courtes', () => {
+  it('un nouvel équipement a sa sortie 1.1 libre, réutilisée par le +', () => {
+    const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
+    expect(findEq(a.p, a.id)!.channels[0].outputs).toEqual([{ dir: 'avant', num: 1 }]);
+    const r = addOutputWithNext(cat, a.p, a.id, 1, 'avant', 'BELT');
+    expect(findEq(r.p, a.id)!.channels[0].outputs).toHaveLength(1);
+    expect(r.p.links[0].from.num).toBe(1);
+  });
+  it('un nouveau canal arrive avec sa sortie 1 en attente', () => {
+    const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
+    const p = addChannel(a.p, a.id);
+    expect(findEq(p, a.id)!.channels[1].outputs).toEqual([{ dir: 'avant', num: 1 }]);
+  });
+  it('arrivée par l\'arrière derrière la source : le trait contourne, sans traverser la cible', () => {
+    let p = emptyPivot(cat);
+    const f = addEq(cat, p, 'BELT', 300, 300, { flow: 'S', options: { reverseAllowed: true } });
+    p = setChainType(cat, f.p, f.id, 2, 'DRIV');
+    const j = addEq(cat, p, 'BELT', 190, 300, { flow: 'N' });
+    p = connect(j.p, { eq: f.id, ch: 1, dir: 'arriere', num: 1 }, { eq: j.id, ch: 1 });
+    const pts = routeAll(p).links[0].points;
+    const box = eqBox(findEq(p, j.id)!);
+    expect(pts[pts.length - 1][1]).toBe(box.y1);
+    expect(pts[pts.length - 2][1]).toBeGreaterThan(box.y1);
+  });
+  it('étiquette : rien pour une sortie unique, numéro seul si besoin', () => {
+    const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
+    const e = findEq(a.p, a.id)!;
+    expect(shortTag(e, 1, 1, 'avant')).toBe('');
+    expect(shortTag(e, 1, 1, 'arriere')).toBe('AR');
+    const two = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }] }] };
+    expect(shortTag(two, 1, 2, 'avant')).toBe('2');
+    const ch2 = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }] }, { outputs: [{ dir: 'avant' as const, num: 1 }] }] };
+    expect(shortTag(ch2, 2, 1, 'avant')).toBe('2');
+    const mix = { ...e, channels: [two.channels[0], ch2.channels[1]] };
+    expect(shortTag(mix, 1, 2, 'avant')).toBe('1.2');
   });
 });

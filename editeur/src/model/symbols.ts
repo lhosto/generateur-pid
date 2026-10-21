@@ -15,7 +15,7 @@ export interface SymbolSpec {
 }
 
 export const BASE_SIZE: Record<Base, [number, number]> = {
-  pill: [56, 28],
+  pill: [48, 24],
   card: [64, 32],
   screen: [56, 30],
   grid: [48, 32],

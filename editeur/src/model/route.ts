@@ -43,6 +43,21 @@ export const outputColor = (_num: number) => 'var(--pid-stroke-light)';
 /** Étiquette courte d'une sortie : « 1.2 » = canal 1, sortie 2 ; « AR » en marche arrière. */
 export const outputTag = (ch: number, num: number, dir: Dir) => `${ch}.${num}${dir === 'arriere' ? ' AR' : ''}`;
 
+/**
+ * Étiquette courte d'une sortie sur le PID, selon ce qui suffit à la distinguer (par sens) :
+ * un seul canal et une seule sortie → rien (« AR » seul en marche arrière) ; un seul canal → numéro
+ * de sortie ; une sortie au plus par canal → numéro de canal ; sinon « canal.sortie ».
+ */
+export function shortTag(eq: Eq | undefined, ch: number, num: number, dir: Dir): string {
+  const ar = dir === 'arriere' ? 'AR' : '';
+  if (!eq) return outputTag(ch, num, dir);
+  const counts = eq.channels.map((c) => c.outputs.filter((o) => o.dir === dir).length);
+  const multi = eq.channels.length > 1;
+  const many = counts.some((n) => n > 1);
+  const core = !multi ? (many ? `${num}` : '') : many ? `${ch}.${num}` : `${ch}`;
+  return [core, ar].filter(Boolean).join(' ');
+}
+
 export interface TagPos {
   x: number;
   y: number;
@@ -96,6 +111,7 @@ export function placeTags(p: Pivot, links: RoutedLink[], text: (l: RoutedLink) =
   const free = (bx: Box) => !placed.some((o) => overlapsBox(o, bx, 1)) && !obstacles.some((o) => overlapsBox(o, bx, 2));
   for (const l of links) {
     const t = text(l);
+    if (!t) continue;
     const cands = tagCandidates(l.points);
     const pick = cands.find((c) => free(tagBox(c, t))) ?? cands[0] ?? tagAnchor(l.points);
     out.set(l.id, pick);
@@ -190,7 +206,10 @@ const endAnchor = (e: End, side: Flow) => anchor(e.box, side, sideOffset(e.eq, s
  * Tracé d'un lien : face à face (droit ou Z) si la voie est libre, sinon en L (départ d'un côté,
  * arrivée par le dessus/dessous ou par le côté), sinon face à face sur l'autre axe.
  */
-/** Retire les points en double et les points alignés (coudes inutiles). */
+/**
+ * Retire les points en double et les points alignés (coudes inutiles). Un demi-tour (aller puis retour
+ * sur la même ligne) n'est pas fusionné : sinon le trait traverserait l'équipement d'arrivée.
+ */
 function simplify(pts: Pt[]): Pt[] {
   const out: Pt[] = [];
   for (const p of pts) {
@@ -200,7 +219,8 @@ function simplify(pts: Pt[]): Pt[] {
     while (out.length >= 3) {
       const [a, b, c] = out.slice(-3);
       const col = (Math.abs(a[0] - b[0]) < 0.5 && Math.abs(b[0] - c[0]) < 0.5) || (Math.abs(a[1] - b[1]) < 0.5 && Math.abs(b[1] - c[1]) < 0.5);
-      if (!col) break;
+      const ahead = (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]) >= 0;
+      if (!col || !ahead) break;
       out.splice(out.length - 2, 1);
     }
   }
@@ -400,12 +420,19 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
   return { links, stubs };
 }
 
-/** Position des poignées « + » : une par canal et par sens, sur l'axe du canal, hors du contour. */
+/**
+ * Position des poignées « + » : une par canal et par sens, hors du contour. Sur l'axe du canal si le
+ * canal n'a encore aucune sortie dans ce sens ; sinon décalée à droite (côté horizontal) ou en dessous
+ * (côté vertical), là où viendra la sortie suivante, pour ne pas la confondre avec la sortie 1.
+ */
 export function handlePositions(eq: Eq, box: Box, dir: Dir): { ch: number; at: Pt }[] {
   const side = dir === 'avant' ? eq.flow : opposite(eq.flow);
   const [vx, vy] = flowVec(side);
-  return eq.channels.map((_, i) => {
+  return eq.channels.map((c, i) => {
     const [ax, ay] = channelAnchor(eq, box, side, i + 1);
-    return { ch: i + 1, at: [ax + vx * 26, ay + vy * 26] as Pt };
+    const used = c.outputs.some((o) => o.dir === dir);
+    const lat = used ? 20 : 0;
+    const out = used ? 18 : 26;
+    return { ch: i + 1, at: [ax + vx * out + (vx === 0 ? lat : 0), ay + vy * out + (vy === 0 ? lat : 0)] as Pt };
   });
 }

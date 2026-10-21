@@ -140,6 +140,13 @@ export function nextOutputNum(eq: Eq, ch: number, dir: Dir): number | null {
   return null;
 }
 
+/** Plus petite sortie déclarée mais pas encore raccordée (en attente), sinon null. */
+export function freeOutputNum(p: Pivot, eq: Eq, ch: number, dir: Dir): number | null {
+  const linked = new Set(p.links.filter((l) => l.from.eq === eq.id && l.from.ch === ch && l.from.dir === dir).map((l) => l.from.num));
+  const free = outputsOf(eq, ch, dir).map((o) => o.num).filter((n) => !linked.has(n));
+  return free.length ? Math.min(...free) : null;
+}
+
 export function canAddOutput(eq: Eq, ch: number, dir: Dir): boolean {
   // Canal absent (retiré entre-temps, par ex. menu du « + » resté ouvert) : aucune sortie possible.
   if (!eq.channels[ch - 1]) return false;

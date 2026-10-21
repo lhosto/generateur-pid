@@ -24,7 +24,8 @@ const L = {
   outputs: { fr: 'Sorties', en: 'Outputs' },
   forwardLine: { fr: 'marche avant', en: 'forward' },
   reverseLine: { fr: 'marche arrière (AR)', en: 'reverse (AR)' },
-  tagMeaning: { fr: 'canal 1, sortie 2', en: 'channel 1, output 2' },
+  tagMeaning: { fr: 'canal 1, sortie 2 (écrit seulement si utile)', en: 'channel 1, output 2 (shown only when needed)' },
+  pendingMeaning: { fr: 'sortie en attente : à raccorder ou supprimer', en: 'pending output: connect or remove it' },
   loopMeaning: { fr: 'boucle, retour en amont', en: 'loop, back upstream' },
   colorsTbc: { fr: 'couleurs à valider', en: 'colors to be confirmed' },
   negative: { fr: 'négative', en: 'negative' },
@@ -158,6 +159,10 @@ export function Legend() {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
           <span style={{ width: 22, font: '600 10px var(--font-tag)', color: 'var(--pid-caption)', textAlign: 'center' }}>↺</span>
           {tx(L.loopMeaning)}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
+          <svg width={22} height={10} aria-hidden="true"><line x1={2} y1={5} x2={16} y2={5} stroke="var(--abi-orange-text)" strokeWidth={2.4} /><circle cx={17} cy={5} r={2.6} fill="var(--abi-orange-text)" /></svg>
+          {tx(L.pendingMeaning)}
         </span>
       </div>
     </div>

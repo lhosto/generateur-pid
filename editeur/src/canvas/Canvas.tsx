@@ -6,11 +6,11 @@ import { boxAt, CH_PITCH, channelOffset, CHUTE_SIZE, eqBox, hg0Of, isHorizontal,
 import { axisCandidates } from '../model/straighten';
 import { guideSnap } from '../model/align';
 import {
-  addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, removeLink, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
-  setLinkTarget,
+  addChannel, addChute, addEq, addOutputWithNext, takeOutput, connect, removeLink, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
+  placeNext, setLinkTarget,
 } from '../model/ops';
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
-import { handlePositions, loopLinks, outputColor, outputTag, placeTags, routeAll, tagAnchor, type Pt } from '../model/route';
+import { handlePositions, loopLinks, outputColor, outputTag, placeTags, shortTag, routeAll, tagAnchor, type Pt } from '../model/route';
 import {
   canAddChannel, canAddOutput, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
   zoneOf,
@@ -120,7 +120,7 @@ const L = {
     en: 'Click: select\nThen drag the arrowhead dot to another Channel [CH]',
   },
   loop: { fr: '↺ Boucle : la matière revient vers un équipement en amont', en: '↺ Loop: material returns to an upstream Equipment item' },
-  stubHint: { fr: 'Sortie non reliée : glisser vers un équipement [EQ]', en: 'Output not connected: drag onto an Equipment item [EQ]' },
+  stubHint: { fr: 'Sortie en attente : clic pour choisir l’équipement [EQ] à raccorder, ou glisser vers un équipement existant · Suppr : la supprimer', en: 'Pending output: click to choose the Equipment item [EQ] to connect, or drag onto an existing one · Del: remove it' },
   retarget: {
     fr: 'Glisser pour changer de canal [CH] ou d’équipement [EQ] d’arrivée',
     en: 'Drag to change the destination Channel [CH] or Equipment item [EQ]',
@@ -208,6 +208,7 @@ export function Canvas(props: Props) {
   const [guides, setGuides] = useState<{ gx?: number; gy?: number }>({});
   const [tip, setTip] = useState<Tip | null>(null);
   const [hoverLink, setHoverLink] = useState<string | null>(null);
+  const [hoverStub, setHoverStub] = useState<string | null>(null);
   const [menu, setMenu] = useState<AddMenu | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
@@ -221,7 +222,7 @@ export function Canvas(props: Props) {
   const routed = useMemo(() => routeAll(pivot), [pivot, lang]);
   const loops = useMemo(() => loopLinks(pivot), [pivot.links, pivot.equipments]);
   const tags = useMemo(
-    () => placeTags(pivot, routed.links, (l) => outputTag(l.link.from.ch, l.link.from.num, l.link.from.dir) + (loops.has(l.id) ? ' ↺' : '')),
+    () => placeTags(pivot, routed.links, (l) => shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir) + (loops.has(l.id) ? ' ↺' : '')),
     [pivot, routed, loops],
   );
   const selEqs = useMemo(() => new Set(sel.eqs), [sel.eqs]);
@@ -500,14 +501,18 @@ export function Canvas(props: Props) {
         force((n) => n + 1);
         return;
       }
-      if (!d.moved) return force((n) => n + 1);
+      if (!d.moved) {
+        // Clic sur une sortie libre : même menu, pour la raccorder à un nouvel équipement.
+        if (d.ref) (setTip(null), setMenu({ ...menuAt, src: d.src, ref: d.ref }));
+        return force((n) => n + 1);
+      }
       const target = d.target ? findEq(pv, d.target) : null;
       if (d.mode === 'retarget') {
         if (target && d.linkId) commit(setLinkTarget(pv, d.linkId, { eq: target.id, ch: d.targetCh }));
         return force((n) => n + 1);
       }
       if (target) {
-        const o = d.ref ? { p: pv, ref: d.ref } : addOutput(pv, src.id, d.src.ch, d.src.dir);
+        const o = d.ref ? { p: pv, ref: d.ref } : takeOutput(pv, src.id, d.src.ch, d.src.dir);
         if (o.ref) commit(connect(o.p, o.ref, { eq: target.id, ch: d.targetCh }));
       } else if (d.mode === 'new' || d.ref) {
         // Lâché dans le vide : même menu, l'équipement choisi sera posé à cet endroit.
@@ -526,13 +531,14 @@ export function Canvas(props: Props) {
     // son canal et, pour une sortie libre, la sortie elle-même doivent encore exister.
     if (!src || !src.channels[m.src.ch - 1]) return;
     let next: { p: Pivot; id: string | null };
-    if (m.ref && m.at) {
+    if (m.ref) {
       const ref = m.ref;
+      const at = m.at ?? (() => { const q = placeNext(pv, src, ref.dir, hg0, ref.ch); return [q.x, q.y] as Pt; })();
       const exists = outputsOf(src, ref.ch, ref.dir).some((o) => o.num === ref.num);
       if (!exists || pv.links.some((l) => sameOutput(l.from, ref))) return;
       // Même sens que le « + » : une sortie arrière repart à contre-flux.
       const flow = ref.dir === 'avant' ? src.flow : opposite(src.flow);
-      const made = addEq(cat, pv, hg0, m.at[0], m.at[1], { flow, zone: zoneOf(src.repere) });
+      const made = addEq(cat, pv, hg0, at[0], at[1], { flow, zone: zoneOf(src.repere) });
       next = { p: connect(made.p, ref, { eq: made.id, ch: 1 }), id: made.id };
     } else {
       next = addOutputWithNext(cat, pv, src.id, m.src.ch, m.src.dir, hg0, m.at ? { x: m.at[0], y: m.at[1] } : undefined);
@@ -718,7 +724,7 @@ export function Canvas(props: Props) {
                     return (
                       // Étiquette cliquable : sélectionne le trait (comme un clic sur le trait).
                       <text x={ta.x} y={ta.y} textAnchor={ta.anchor} dominantBaseline="central" style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'pointer', fill: on ? 'var(--pid-select)' : TAG_STYLE.fill }}>
-                        {outputTag(l.link.from.ch, l.link.from.num, l.link.from.dir)}{loops.has(l.id) ? ' ↺' : ''}
+                        {shortTag(findEq(pivot, l.link.from.eq), l.link.from.ch, l.link.from.num, l.link.from.dir)}{loops.has(l.id) ? ' ↺' : ''}
                       </text>
                     );
                   })()}
@@ -735,15 +741,25 @@ export function Canvas(props: Props) {
                     props.setSel({ ...EMPTY_SEL, stub: s.ref });
                     startWire(e, { eq: s.ref.eq, ch: s.ref.ch, dir: s.ref.dir }, b, s.ref);
                   }}
-                  onPointerEnter={(e) => pointerTip(e, stubTip(s.ref))}
-                  onPointerLeave={() => setTip(null)}
+                  onPointerEnter={(e) => { setHoverStub(s.key); pointerTip(e, stubTip(s.ref)); }}
+                  onPointerLeave={() => { setHoverStub(null); setTip(null); }}
                   style={{ cursor: 'crosshair' }}
                 >
                   <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="transparent" strokeWidth={10} />
-                  <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={on ? 'var(--pid-select)' : outputColor(s.num)} strokeWidth={2} strokeDasharray={s.dashed ? '4 3' : undefined} />
-                  {/* Sortie libre : petit trait sans cercle, étiquette dans le prolongement du trait. */}
-                  <text x={b[0] + (b[0] - a[0]) * 0.5 + (b[0] === a[0] ? 0 : Math.sign(b[0] - a[0]) * 4)} y={b[1] + (b[1] - a[1]) * 0.5} textAnchor={b[0] === a[0] ? 'middle' : b[0] > a[0] ? 'start' : 'end'} dominantBaseline="central" style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'crosshair' }}>
-                    {outputTag(s.ref.ch, s.ref.num, s.ref.dir)}
+                  {/* Sortie libre (en attente de raccordement) : accentuée en orange, à raccorder ou à supprimer. */}
+                  <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={on ? 'var(--pid-select)' : 'var(--abi-orange-text)'} strokeWidth={2.4} strokeDasharray={s.dashed ? '4 3' : undefined} />
+                  {hoverStub === s.key || on ? (
+                    // Au survol : « + » au bout de la sortie, clic = choisir l'équipement à raccorder.
+                    <g>
+                      <circle cx={b[0]} cy={b[1]} r={6} fill="var(--pid-band)" stroke="var(--abi-green)" strokeWidth={1.4} />
+                      <path d={`M${b[0] - 3} ${b[1]} h6 M${b[0]} ${b[1] - 3} v6`} stroke="#fff" strokeWidth={1.4} strokeLinecap="round" />
+                    </g>
+                  ) : (
+                    <circle cx={b[0]} cy={b[1]} r={2.6} fill="var(--abi-orange-text)" />
+                  )}
+                  {/* Étiquette dans le prolongement du trait. */}
+                  <text x={b[0] + (b[0] - a[0]) * 0.5 + (b[0] === a[0] ? 0 : Math.sign(b[0] - a[0]) * 4)} y={b[1] + (b[1] - a[1]) * 0.5} textAnchor={b[0] === a[0] ? 'middle' : b[0] > a[0] ? 'start' : 'end'} dominantBaseline="central" style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'crosshair', fill: on ? 'var(--pid-select)' : 'var(--abi-orange-text)' }}>
+                    {shortTag(findEq(pivot, s.ref.eq), s.ref.ch, s.ref.num, s.ref.dir)}
                   </text>
                 </g>
               );

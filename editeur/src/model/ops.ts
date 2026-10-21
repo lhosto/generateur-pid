@@ -5,6 +5,7 @@ import { PIVOT_FORMAT, uid, type Chute, type Dir, type Eq, type Flow, type Link,
 import {
   defaultOptions, defaultSetpoints, defaultStack, chainOf, hgDef, proximityOf, makeHg,
   nextOutputNum, normalizeChain, suggestRepere, zoneOf, MAX, canAddChannel, canAddOutput,
+  freeOutputNum, reverseBlocked,
 } from './rules';
 import { symbolOf } from './symbols';
 
@@ -46,8 +47,20 @@ export function createEq(cat: Catalogue, p: Pivot, hg0: string, x: number, y: nu
     hg,
     options: { ...defaultOptions(cat), ...(o.options ?? {}) },
     setpoints: defaultSetpoints(cat, hg[0].type),
-    channels: Array.from({ length: Math.min(MAX.channels, o.channels ?? 1) }, () => ({ outputs: [] })),
+    // Nativement, le canal 1 a sa sortie 1.1 déclarée, en attente de raccordement (sauf armoire « no action »).
+    channels: Array.from({ length: Math.min(MAX.channels, o.channels ?? 1) }, (_, i) => ({
+      outputs: i === 0 && !cat.noAction.includes(hg0) ? [{ dir: 'avant' as const, num: 1 }] : [],
+    })),
   };
+}
+
+/** Sortie à raccorder : la première sortie en attente du canal, sinon une nouvelle. */
+export function takeOutput(p: Pivot, eqId: string, ch: number, dir: Dir): { p: Pivot; ref: OutputRef | null } {
+  const eq = findEq(p, eqId);
+  if (!eq) return { p, ref: null };
+  if (dir === 'arriere' && reverseBlocked(eq)) return { p, ref: null };
+  const free = freeOutputNum(p, eq, ch, dir);
+  return free !== null ? { p, ref: { eq: eqId, ch, dir, num: free } } : addOutput(p, eqId, ch, dir);
 }
 
 export function addEq(cat: Catalogue, p: Pivot, hg0: string, x: number, y: number, o: NewEqOpts = {}): { p: Pivot; id: string } {
@@ -109,7 +122,7 @@ export function placeNext(p: Pivot, src: Eq, dir: Dir, hg0: string, ch: number):
 export function addOutputWithNext(cat: Catalogue, p: Pivot, eqId: string, ch: number, dir: Dir, hg0: string, at?: { x: number; y: number }): { p: Pivot; id: string | null } {
   const src = findEq(p, eqId);
   if (!src) return { p, id: null };
-  const r = addOutput(p, eqId, ch, dir);
+  const r = takeOutput(p, eqId, ch, dir);
   if (!r.ref) return { p, id: null };
   const pos = at ?? placeNext(r.p, src, dir, hg0, ch);
   const flow = dir === 'avant' ? src.flow : opposite(src.flow);
@@ -168,7 +181,8 @@ export function setOutputNum(p: Pivot, ref: OutputRef, num: number): Pivot {
 export function addChannel(p: Pivot, eqId: string): Pivot {
   const eq = findEq(p, eqId);
   if (!eq || !canAddChannel(eq)) return p;
-  return touch(mapEq(p, eqId, (e) => ({ ...e, channels: [...e.channels, { outputs: [] }] })));
+  // Le nouveau canal arrive, comme un nouvel équipement, avec sa sortie 1 en attente de raccordement.
+  return touch(mapEq(p, eqId, (e) => ({ ...e, channels: [...e.channels, { outputs: [{ dir: 'avant' as const, num: 1 }] }] })));
 }
 
 /** Retire le canal n : ses sorties et les liens qui y arrivent disparaissent, les canaux suivants remontent. */
@@ -281,7 +295,7 @@ export function duplicate(cat: Catalogue, p: Pivot, eqIds: string[]): { p: Pivot
       x: e.x + 40,
       y: e.y + 40,
       hg: e.hg.map((h) => ({ ...h, id: uid('hg') })),
-      channels: e.channels.map(() => ({ outputs: [] })),
+      channels: e.channels.map((_, i) => ({ outputs: i === 0 && !cat.noAction.includes(e.hg[0]?.type ?? '') ? [{ dir: 'avant' as const, num: 1 }] : [] })),
     };
     next = { ...next, equipments: [...next.equipments, copy] };
     ids.push(copy.id);

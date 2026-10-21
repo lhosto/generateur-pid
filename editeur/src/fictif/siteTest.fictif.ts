@@ -3,9 +3,8 @@
 // recirculation qui reboucle, armoires no action, arrêts d'urgence, portes d'accès, goulottes.
 // Les repères suivent les préfixes proposés (08 tapis, 13 tri optique…), à valider.
 import type { Catalogue } from '../model/catalogue';
-import { addChute, addEq, addProximity, connect, emptyPivot, findEq, setChainType, type NewEqOpts } from '../model/ops';
+import { addChute, addEq, addProximity, connect, emptyPivot, findEq, setChainType, takeOutput, type NewEqOpts } from '../model/ops';
 import type { Dir, Pivot } from '../model/pivot';
-import { nextOutputNum } from '../model/rules';
 import { straighten } from '../model/straighten';
 
 const X = (c: number) => 90 + c * 130;
@@ -24,8 +23,8 @@ export function siteTest(cat: Catalogue): Pivot {
   const ln = (from: string, to: string, o: { ch?: number; dir?: Dir; toCh?: number } = {}) => {
     const ch = o.ch ?? 1;
     const dir = o.dir ?? 'avant';
-    const num = nextOutputNum(findEq(p, id[from])!, ch, dir)!;
-    p = connect(p, { eq: id[from], ch, dir, num }, { eq: id[to], ch: o.toCh ?? 1 });
+    const t = takeOutput(p, id[from], ch, dir);
+    p = connect(t.p, t.ref!, { eq: id[to], ch: o.toCh ?? 1 });
   };
   const prox = (rep: string, type: string) => (p = addProximity(cat, p, id[rep], type));
 
@@ -169,8 +168,8 @@ export function stressSite(cat: Catalogue): Pivot {
       p = made.p;
       if (prev) {
         const src = findEq(p, prev)!;
-        const num = nextOutputNum(src, 1, 'avant');
-        if (num) p = connect(p, { eq: prev, ch: 1, dir: 'avant', num }, { eq: made.id, ch: 1 });
+        const t = takeOutput(p, src.id, 1, 'avant');
+        if (t.ref) p = connect(t.p, t.ref, { eq: made.id, ch: 1 });
       }
       prev = made.id;
     }
