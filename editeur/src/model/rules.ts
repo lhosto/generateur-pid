@@ -17,6 +17,7 @@ const L = {
   kmNoReverse: { fr: 'Commande par contacteur (KM) : marche arrière impossible', en: 'Contactor control (KM): reverse not possible' },
   reverseOff: { fr: "Marche arrière non autorisée (option de l'équipement [EQ])", en: 'Reverse not allowed (Equipment [EQ] option)' },
   negative: { fr: 'négative', en: 'negative' },
+  main: { fr: 'principale', en: 'main' },
   positive: { fr: 'positive', en: 'positive' },
   forward: { fr: 'avant', en: 'forward' },
   reverse: { fr: 'arrière', en: 'reverse' },
@@ -156,12 +157,16 @@ export function canAddOutput(eq: Eq, ch: number, dir: Dir): boolean {
 
 export const canAddChannel = (eq: Eq) => eq.channels.length < MAX.channels;
 
-export const polarity = (num: number) => tx(num === 1 ? L.negative : L.positive);
+/**
+ * Type d'une sortie. Seule sortie du canal dans ce sens : « principale » (pas de négative / positive
+ * tant qu'il n'y a pas de choix). Sinon S1 = négative, les suivantes = positives.
+ */
+export const polarity = (num: number, count = 2) => tx(count <= 1 ? L.main : num === 1 ? L.negative : L.positive);
 export const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** Étiquette d'une sortie : repère · CH01 · S1 · sens · polarité (CH01 et S1 sont des noms, non traduits). */
 export function outputLabel(eq: Eq, ch: number, dir: Dir, num: number): string {
-  return `${eq.repere || '?'} · CH${pad2(ch)} · S${num} · ${tx(dir === 'avant' ? L.forward : L.reverse)} · ${polarity(num)}`;
+  return `${eq.repere || '?'} · CH${pad2(ch)} · S${num} · ${tx(dir === 'avant' ? L.forward : L.reverse)} · ${polarity(num, outputsOf(eq, ch, dir).length)}`;
 }
 
 /** First channel : coché automatiquement si aucune sortie n'arrive dans le canal. */
@@ -237,6 +242,47 @@ export function suggestRepere(cat: Catalogue, p: Pivot, hg0: string, zoneHint?: 
     if (!used.has(r.toLowerCase())) return r;
   }
   return prefix + zone + '?';
+}
+
+/**
+ * Repère de l'équipement suivant dans un enchaînement de même type (convoyeur après convoyeur) : on
+ * prolonge le repère de l'équipement de départ. Fin en lettre → lettre suivante (04a → 04b) ; fin en
+ * nombre → nombre suivant (10 → 11). Si l'équipement qui alimente le départ suit la même forme, son
+ * écart donne le pas (10 → 20 → 30) : la dernière règle établie est conservée. Rend undefined si le
+ * repère ne se prolonge pas (vide, après z…) : on revient alors à la proposition par préfixe.
+ */
+export function chainRepere(p: Pivot, src: Eq, hg0: string): string | undefined {
+  if ((src.hg[0]?.type ?? '') !== hg0) return undefined;
+  const parse = (r: string) => {
+    const m = /^(.*?)(\d+|[A-Za-z])$/.exec(r.trim());
+    if (!m) return null;
+    const num = /^\d+$/.test(m[2]);
+    return { stem: m[1], tail: m[2], num, val: num ? parseInt(m[2], 10) : m[2].toLowerCase().charCodeAt(0) - 97 };
+  };
+  const cur = parse(src.repere);
+  if (!cur) return undefined;
+  // Pas établi par l'équipement amont (lien de marche avant qui arrive sur le départ), même forme.
+  let step = 1;
+  for (const l of p.links) {
+    if (l.to.eq !== src.id || l.from.dir !== 'avant' || l.from.eq === src.id) continue;
+    const up = p.equipments.find((e) => e.id === l.from.eq);
+    const prev = up && parse(up.repere);
+    if (prev && prev.stem === cur.stem && prev.num === cur.num && cur.val > prev.val) {
+      step = cur.val - prev.val;
+      break;
+    }
+  }
+  const used = new Set(p.equipments.map((e) => e.repere.trim().toLowerCase()));
+  for (let k = 1; k <= 50; k++) {
+    const v = cur.val + step * k;
+    let tail: string;
+    if (cur.num) tail = String(v).padStart(cur.tail.length, '0');
+    else if (v < 26) tail = String.fromCharCode((cur.tail === cur.tail.toUpperCase() ? 65 : 97) + v);
+    else return undefined;
+    const r = cur.stem + tail;
+    if (!used.has(r.toLowerCase())) return r;
+  }
+  return undefined;
 }
 
 export function zoneOf(repere: string): string | undefined {

@@ -7,7 +7,7 @@ import { principals, type Catalogue } from './catalogue';
 import { SYMBOLS } from './symbols';
 import { straighten } from './straighten';
 import { boxAt, eqBox } from './geometry';
-import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum } from './ops';
+import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum, takeOutput, updateEq } from './ops';
 import type { Pivot } from './pivot';
 import { loopLinks, routeAll, shortTag } from './route';
 import {
@@ -75,7 +75,7 @@ describe('canaux et sorties', () => {
     const a = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { repere: '08Aa' });
     const r = addOutputWithNext(cat, a.p, a.id, 1, 'avant', 'BELT');
     expect(r.p.links).toHaveLength(1);
-    expect(r.p.links[0].from).toMatchObject({ eq: a.id, ch: 1, dir: 'avant', num: 1 });
+    expect(r.p.links[0].from).toMatchObject({ eq: a.id, ch: 1, dir: 'avant', num: 2 }); // la sortie 1 reste en attente
     expect(isFirstChannel(r.p, a.id, 1)).toBe(true);
     expect(isFirstChannel(r.p, r.id!, 1)).toBe(false);
     expect(findEq(r.p, r.id!)!.repere).toBe('08Ab');
@@ -246,12 +246,12 @@ describe('repères en double et formes orientées', () => {
     expect(findEq(r.p, r.ids[0])!.repereAktid).toBe('');
     expect(r.p.equipments.filter((e) => incompleteReasons(cat, r.p, e).length)).toEqual([]);
   });
-  it('un tapis qui descend est vertical, et reste allongé avec deux canaux', () => {
+  it('un tapis qui descend est vertical ; plus de canaux = plus épais, pas plus long', () => {
     const h = eqBox(createEq(cat, emptyPivot(cat), 'BELT', 0, 0, { flow: 'S' }));
     expect(h.h).toBeGreaterThan(h.w);
-    const two = createEq(cat, emptyPivot(cat), 'BELT', 0, 0, { flow: 'S', channels: 2 });
-    const b2 = eqBox(two);
-    expect(b2.h).toBeGreaterThan(b2.w);
+    const b3 = eqBox(createEq(cat, emptyPivot(cat), 'BELT', 0, 0, { flow: 'S', channels: 3 }));
+    expect(b3.h).toBe(h.h);
+    expect(b3.w).toBeGreaterThan(h.w);
     const flat = eqBox(createEq(cat, emptyPivot(cat), 'BELT', 0, 0, { flow: 'E', channels: 2 }));
     expect(flat.w).toBeGreaterThan(flat.h);
   });
@@ -311,12 +311,13 @@ describe('côtés imposés par le flux', () => {
 });
 
 describe('sortie 1.1 en attente et étiquettes courtes', () => {
-  it('un nouvel équipement a sa sortie 1.1 libre, réutilisée par le +', () => {
+  it('un nouvel équipement a sa sortie 1.1 libre ; le + ajoute la sortie 2 et laisse la 1 en attente', () => {
     const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
     expect(findEq(a.p, a.id)!.channels[0].outputs).toEqual([{ dir: 'avant', num: 1 }]);
     const r = addOutputWithNext(cat, a.p, a.id, 1, 'avant', 'BELT');
-    expect(findEq(r.p, a.id)!.channels[0].outputs).toHaveLength(1);
-    expect(r.p.links[0].from.num).toBe(1);
+    expect(findEq(r.p, a.id)!.channels[0].outputs).toHaveLength(2);
+    expect(r.p.links[0].from.num).toBe(2);
+    expect(takeOutput(r.p, a.id, 1, 'avant').ref!.num).toBe(1);
   });
   it('un nouveau canal arrive avec sa sortie 1 en attente', () => {
     const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
@@ -340,10 +341,80 @@ describe('sortie 1.1 en attente et étiquettes courtes', () => {
     expect(shortTag(e, 1, 1, 'avant')).toBe('');
     expect(shortTag(e, 1, 1, 'arriere')).toBe('AR');
     const two = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }] }] };
-    expect(shortTag(two, 1, 2, 'avant')).toBe('2');
+    expect(shortTag(two, 1, 2, 'avant')).toBe('1.2');
     const ch2 = { ...e, channels: [{ outputs: [{ dir: 'avant' as const, num: 1 }] }, { outputs: [{ dir: 'avant' as const, num: 1 }] }] };
     expect(shortTag(ch2, 2, 1, 'avant')).toBe('2');
     const mix = { ...e, channels: [two.channels[0], ch2.channels[1]] };
     expect(shortTag(mix, 1, 2, 'avant')).toBe('1.2');
+  });
+});
+
+describe('repère du convoyeur suivant', () => {
+  const chain = (first: string, n: number) => {
+    let a = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { repere: first });
+    let p = a.p;
+    let id = a.id;
+    const out = [first];
+    for (let i = 0; i < n; i++) {
+      const r = addOutputWithNext(cat, p, id, 1, 'avant', 'BELT');
+      p = r.p;
+      id = r.id!;
+      out.push(findEq(p, id)!.repere);
+    }
+    return { p, id, out };
+  };
+  it('lettre suivante : 04a → 04b → 04c', () => expect(chain('04a', 2).out).toEqual(['04a', '04b', '04c']));
+  it('nombre suivant : 10 → 11 → 12', () => expect(chain('10', 2).out).toEqual(['10', '11', '12']));
+  it('le pas établi est conservé : 10, 20 → 30 → 40', () => {
+    const { p, id } = chain('10', 1);
+    const q = updateEq(p, id, { repere: '20' });
+    const r1 = addOutputWithNext(cat, q, id, 1, 'avant', 'BELT');
+    const r2 = addOutputWithNext(cat, r1.p, r1.id!, 1, 'avant', 'BELT');
+    expect([findEq(r1.p, r1.id!)!.repere, findEq(r2.p, r2.id!)!.repere]).toEqual(['30', '40']);
+  });
+});
+
+describe('départs de sorties', () => {
+  it('sortie 1 en attente et sortie 2 reliée : départs distincts, dans la forme', () => {
+    const a = addEq(cat, emptyPivot(cat), 'BELT', 300, 300);
+    const r = addOutputWithNext(cat, a.p, a.id, 1, 'avant', 'BELT');
+    const box = eqBox(findEq(r.p, a.id)!);
+    const { links, stubs } = routeAll(r.p);
+    const s2 = links.find((l) => l.link.from.eq === a.id)!.points[0];
+    const s1 = stubs.find((s) => s.ref.eq === a.id)!.points[0];
+    expect(s1[1]).toBeLessThan(s2[1]);
+    for (const y of [s1[1], s2[1]]) expect(y > box.y0 && y < box.y1).toBe(true);
+  });
+});
+
+describe('croisements de traits', () => {
+  const crossings = (links: { points: [number, number][] }[]) => {
+    let n = 0;
+    const segs = links.map((l) => l.points.slice(1).map((q, i) => [l.points[i], q] as const));
+    for (let a = 0; a < segs.length; a++)
+      for (let b = a + 1; b < segs.length; b++)
+        for (const [p0, p1] of segs[a])
+          for (const [q0, q1] of segs[b]) {
+            const pH = p0[1] === p1[1];
+            const qH = q0[1] === q1[1];
+            if (pH === qH) continue;
+            const [h0, h1, v0, v1] = pH ? [p0, p1, q0, q1] : [q0, q1, p0, p1];
+            const x = v0[0];
+            const y = h0[1];
+            if (x > Math.min(h0[0], h1[0]) + 0.5 && x < Math.max(h0[0], h1[0]) - 0.5 && y > Math.min(v0[1], v1[1]) + 0.5 && y < Math.max(v0[1], v1[1]) - 0.5) n++;
+          }
+    return n;
+  };
+  it('deux arrivées sur le même équipement, l\'une d\'en haut, l\'autre d\'en bas : pas de croisement', () => {
+    let p = emptyPivot(cat);
+    const up = addEq(cat, p, 'BELT', 100, 100);
+    const down = addEq(cat, up.p, 'BELT', 100, 400);
+    const dst = addEq(cat, down.p, 'BELT', 400, 250);
+    p = connect(dst.p, { eq: up.id, ch: 1, dir: 'avant', num: 1 }, { eq: dst.id, ch: 1 });
+    p = connect(p, { eq: down.id, ch: 1, dir: 'avant', num: 1 }, { eq: dst.id, ch: 1 });
+    expect(crossings(routeAll(p).links)).toBe(0);
+  });
+  it('site de test : seuls restent les croisements imposés (ordre des sorties, canaux différents)', () => {
+    expect(crossings(routeAll(siteTest(cat)).links)).toBeLessThanOrEqual(8);
   });
 });

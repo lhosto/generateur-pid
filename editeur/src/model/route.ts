@@ -1,7 +1,7 @@
 // Routage orthogonal des liens. Chaque canal a un axe fixe (geometry.sideOffset) : tous les liens d'un
 // canal partent et arrivent exactement sur cet axe, si bien que deux canaux alignés donnent un trait droit.
 // Le côté de départ fait face à la cible ; si la voie est bouchée, tracé en L puis Z sur l'autre axe.
-import { baseOf, channelOffset, eqBox, flowVec, isHorizontal, opposite, sideOffset, type Box } from './geometry';
+import { channelOffset, eqBox, flowVec, isHorizontal, opposite, sideOffset, type Box } from './geometry';
 import type { Dir, Eq, Flow, Link, OutputRef, Pivot } from './pivot';
 import { outputLabel } from './rules';
 import { symbolOf } from './symbols';
@@ -32,7 +32,6 @@ export interface Stub {
   label: string;
 }
 
-const POINTY = new Set(['diamond', 'circle']);
 
 /**
  * Couleur d'un trait. Couleurs par sortie retirées pour le moment (demande d'Alex du 21/10) : trait neutre ;
@@ -45,8 +44,8 @@ export const outputTag = (ch: number, num: number, dir: Dir) => `${ch}.${num}${d
 
 /**
  * Étiquette courte d'une sortie sur le PID, selon ce qui suffit à la distinguer (par sens) :
- * un seul canal et une seule sortie → rien (« AR » seul en marche arrière) ; un seul canal → numéro
- * de sortie ; une sortie au plus par canal → numéro de canal ; sinon « canal.sortie ».
+ * un seul canal et une seule sortie → rien (« AR » seul en marche arrière) ; une sortie au plus par
+ * canal → numéro de canal ; plusieurs sorties sur un canal → « canal.sortie » (1.1, 1.2).
  */
 export function shortTag(eq: Eq | undefined, ch: number, num: number, dir: Dir): string {
   const ar = dir === 'arriere' ? 'AR' : '';
@@ -54,7 +53,7 @@ export function shortTag(eq: Eq | undefined, ch: number, num: number, dir: Dir):
   const counts = eq.channels.map((c) => c.outputs.filter((o) => o.dir === dir).length);
   const multi = eq.channels.length > 1;
   const many = counts.some((n) => n > 1);
-  const core = !multi ? (many ? `${num}` : '') : many ? `${ch}.${num}` : `${ch}`;
+  const core = many ? `${ch}.${num}` : multi ? `${ch}` : '';
   return [core, ar].filter(Boolean).join(' ');
 }
 
@@ -232,7 +231,7 @@ function simplify(pts: Pt[]): Pt[] {
  * côté, puis un L ou un Z dont le segment du milieu glisse pour éviter les équipements.
  * Rend null si aucun tracé libre n'est trouvé.
  */
-function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], others: Box[], bias: number): Pt[] | null {
+function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], others: Box[], bias: number, clear?: (pts: Pt[]) => boolean): Pt[] | null {
   const [sx, sy] = flowVec(sSide);
   const [tx, ty] = flowVec(tSide);
   const p1: Pt = [s[0] + sx * 12, s[1] + sy * 12];
@@ -246,7 +245,7 @@ function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], other
       const obs = i === 1 || i === full.length - 1 ? others : all;
       if (obs.some((o) => hits(full[i - 1], full[i], o, 4))) return null;
     }
-    return full;
+    return clear && !clear(full) ? null : full;
   };
   const tries: Pt[][] = [
     [s, p1, [p2[0], p1[1]], p2, t],
@@ -269,11 +268,52 @@ function connectSides(s: Pt, sSide: Flow, t: Pt, tSide: Flow, ends: Box[], other
  * Tracé d'un lien entre deux côtés imposés : départ par le sens du flux (aval en marche avant, amont
  * en marche arrière), arrivée par l'arrière de la cible ou par son milieu (voir arrivalSide).
  */
-function routeLink(a: End, b: End, obstacles: Box[], sSide: Flow, tSide: Flow): Pt[] {
+/** Trait déjà tracé : ses segments et le point d'arrivée (des traits vers le même point peuvent se rejoindre). */
+interface Placed {
+  pts: Pt[];
+  end: Pt;
+}
+
+const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
+
+/**
+ * Deux segments orthogonaux se croisent (intersection strictement intérieure aux deux), ou se
+ * superposent sur la même ligne. La superposition est permise si les deux traits vont au même point
+ * d'arrivée (ils se rejoignent avant la flèche) ; le croisement, jamais.
+ */
+function conflicts(a0: Pt, a1: Pt, b0: Pt, b1: Pt, sameEnd: boolean): boolean {
+  const aH = near(a0[1], a1[1]);
+  const bH = near(b0[1], b1[1]);
+  const [ax0, ax1] = [Math.min(a0[0], a1[0]), Math.max(a0[0], a1[0])];
+  const [ay0, ay1] = [Math.min(a0[1], a1[1]), Math.max(a0[1], a1[1])];
+  const [bx0, bx1] = [Math.min(b0[0], b1[0]), Math.max(b0[0], b1[0])];
+  const [by0, by1] = [Math.min(b0[1], b1[1]), Math.max(b0[1], b1[1])];
+  if (aH !== bH) {
+    const [h, v] = aH ? [[ax0, ax1, a0[1]], [b0[0], by0, by1]] : [[bx0, bx1, b0[1]], [a0[0], ay0, ay1]];
+    return v[0] > h[0] + 0.5 && v[0] < h[1] - 0.5 && h[2] > v[1] + 0.5 && h[2] < v[2] - 0.5;
+  }
+  if (sameEnd) return false;
+  if (aH) return near(a0[1], b0[1]) && Math.min(ax1, bx1) - Math.max(ax0, bx0) > 1;
+  return near(a0[0], b0[0]) && Math.min(ay1, by1) - Math.max(ay0, by0) > 1;
+}
+
+/** Le tracé ne croise (ni ne longe) aucun trait déjà posé. */
+function crossesNone(pts: Pt[], end: Pt, placed: Placed[]): boolean {
+  for (const q of placed) {
+    const same = near(q.end[0], end[0]) && near(q.end[1], end[1]);
+    for (let i = 1; i < pts.length; i++)
+      for (let j = 1; j < q.pts.length; j++) if (conflicts(pts[i - 1], pts[i], q.pts[j - 1], q.pts[j], same)) return false;
+  }
+  return true;
+}
+
+function routeLink(a: End, b: End, obstacles: Box[], sSide: Flow, tSide: Flow, placed: Placed[] = []): Pt[] {
   const s0 = endAnchor(a, sSide);
   const t = channelAnchor(b.eq, b.box, tSide, b.ch);
-  // Côtés imposés par le sens du flux ; si aucun tracé n'évite tout, on accepte de passer sur un équipement.
+  // Côtés imposés par le sens du flux. D'abord sans croiser aucun trait déjà tracé ; sinon on accepte
+  // un croisement ; en dernier recours, de passer sur un équipement.
   return (
+    connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0, (pts) => crossesNone(pts, t, placed)) ??
     connectSides(s0, sSide, t, tSide, [a.box, b.box], obstacles, a.port ?? 0) ??
     connectSides(s0, sSide, t, tSide, [], [], a.port ?? 0) ??
     simplify([s0, t])
@@ -325,6 +365,25 @@ export function loopLinks(p: Pivot): Set<string> {
   return loops;
 }
 
+/** Écart entre deux sorties voisines d'un même canal, le long du côté : le groupe tient dans la bande du canal. */
+export function portPitch(eq: Eq, box: Box, count: number): number {
+  const band = (isHorizontal(eq.flow) ? box.h : box.w) / eq.channels.length - 6;
+  return Math.min(14, band / Math.max(1, count - 1));
+}
+
+/** Décalage de la sortie de rang `rank` (0 = S1) dans un groupe de `count`, centré sur l'axe du canal. */
+const slot = (eq: Eq, box: Box, rank: number, count: number) => (rank - (count - 1) / 2) * portPitch(eq, box, count);
+
+/**
+ * Décalage du départ de la sortie num par rapport à l'axe du canal. Les sorties déclarées (reliées ou
+ * en attente) se partagent la bande du canal, centrées sur l'axe : S1 à gauche / en haut, puis S2, S3…
+ * à droite / en dessous. Une sortie seule est sur l'axe.
+ */
+export function portOffset(eq: Eq, box: Box, ch: number, dir: Dir, num: number): number {
+  const nums = (eq.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir).map((o) => o.num).sort((a, b) => a - b);
+  return slot(eq, box, Math.max(0, nums.indexOf(num)), nums.length);
+}
+
 export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
   const eqs = new Map(p.equipments.map((e) => [e.id, e]));
   const boxes = new Map(p.equipments.map((e) => [e.id, eqBox(e)]));
@@ -340,34 +399,45 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k)!.push(l);
   }
+  // Ordre fixe, sorties en attente comprises, groupe centré sur l'axe du canal : S1, puis S2, S3… toujours à droite
+  // (côté horizontal) ou en dessous (côté vertical) : 1.2 est toujours à droite de 1.1.
   for (const g of groups.values()) {
-    if (g.length < 2) continue;
-    g.sort((x, y) => x.from.num - y.from.num);
     const e = eqs.get(g[0].from.eq);
     if (!e) continue;
-    const b = boxes.get(e.id)!;
-    const n = e.channels.length;
-    const half = ((isHorizontal(e.flow) ? b.h : b.w) / n) / 2 - 3;
-    // Ordre fixe : S1 sur l'axe du canal, puis S2, S3… toujours à droite (côté horizontal) ou en
-    // dessous (côté vertical), quelle que soit la cible : 1.2 est toujours à droite de 1.1.
-    const pitch2 = Math.min(14, (half * 2 - 3) / Math.max(1, g.length - 1));
-    g.forEach((l, i) => ports.set(l.id, i * pitch2));
+    for (const l of g) ports.set(l.id, portOffset(e, boxes.get(e.id)!, l.from.ch, l.from.dir, l.from.num));
+  }
+
+  const valid = p.links.filter((l) => eqs.has(l.from.eq) && eqs.has(l.to.eq));
+  const route = (l: Link, placed: Placed[]): Pt[] => {
+    const src = eqs.get(l.from.eq)!;
+    const dst = eqs.get(l.to.eq)!;
+    const a: End = { eq: src, box: boxes.get(src.id)!, ch: l.from.ch, port: ports.get(l.id) ?? 0 };
+    const b: End = { eq: dst, box: boxes.get(dst.id)!, ch: l.to.ch };
+    if (src.id === dst.id) {
+      const sSide = l.from.dir === 'avant' ? src.flow : opposite(src.flow);
+      return selfLoop(a.box, channelAnchor(src, a.box, sSide, a.ch), channelAnchor(src, a.box, opposite(sSide), b.ch), sSide);
+    }
+    return routeLink(a, b, obstaclesFor(src.id, dst.id), departureSide(src, l.from.dir), arrivalSide(dst, a.box, b.box), placed);
+  };
+  // 1re passe : chaque trait évite ceux déjà tracés. 2e et 3e passes : un trait qui croise encore est
+  // retracé en tenant compte de tous les autres, gardé seulement s'il ne croise plus rien.
+  const paths: Pt[][] = [];
+  const asPlaced = (pts: Pt[]): Placed => ({ pts, end: pts[pts.length - 1] });
+  for (const l of valid) paths.push(route(l, paths.map(asPlaced)));
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < valid.length; i++) {
+      const others = paths.filter((_, j) => j !== i).map(asPlaced);
+      if (crossesNone(paths[i], paths[i][paths[i].length - 1], others)) continue;
+      const again = route(valid[i], others);
+      if (crossesNone(again, again[again.length - 1], others)) paths[i] = again;
+    }
   }
 
   const links: RoutedLink[] = [];
-  for (const l of p.links) {
-    const src = eqs.get(l.from.eq);
-    const dst = eqs.get(l.to.eq);
-    if (!src || !dst) continue;
-    const a: End = { eq: src, box: boxes.get(src.id)!, ch: l.from.ch, port: ports.get(l.id) ?? 0 };
-    const b: End = { eq: dst, box: boxes.get(dst.id)!, ch: l.to.ch };
-    let points: Pt[];
-    if (src.id === dst.id) {
-      const sSide = l.from.dir === 'avant' ? src.flow : opposite(src.flow);
-      points = selfLoop(a.box, channelAnchor(src, a.box, sSide, a.ch), channelAnchor(src, a.box, opposite(sSide), b.ch), sSide);
-    } else {
-      points = routeLink(a, b, obstaclesFor(src.id, dst.id), departureSide(src, l.from.dir), arrivalSide(dst, a.box, b.box));
-    }
+  valid.forEach((l, i) => {
+    const src = eqs.get(l.from.eq)!;
+    const dst = eqs.get(l.to.eq)!;
+    const points = paths[i];
     let inner: [Pt, Pt] | undefined;
     if (dst.channels.length > 1 && src.id !== dst.id && points.length >= 2) {
       const e = points[points.length - 1];
@@ -386,7 +456,7 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
       dashed: l.from.dir === 'arriere',
       label: `${outputLabel(src, l.from.ch, l.from.dir, l.from.num)}  →  ${dst.repere || '?'} · CH${String(l.to.ch).padStart(2, '0')}`,
     });
-  }
+  });
 
   // Sorties libres : petit trait sur l'axe du canal, côté flux (avant) ou côté opposé (arrière),
   // légèrement écartées entre elles pour rester saisissables.
@@ -394,17 +464,15 @@ export function routeAll(p: Pivot): { links: RoutedLink[]; stubs: Stub[] } {
   const stubs: Stub[] = [];
   for (const e of p.equipments) {
     const box = boxes.get(e.id)!;
-    const pointy = POINTY.has(baseOf(e));
     e.channels.forEach((c, ci) => {
       const ch = ci + 1;
       for (const dir of ['avant', 'arriere'] as Dir[]) {
         const free = c.outputs.filter((o) => o.dir === dir && !linked.has(`${e.id}|${ch}|${dir}|${o.num}`)).sort((x, y) => x.num - y.num);
         const side = dir === 'avant' ? e.flow : opposite(e.flow);
         const [vx, vy] = flowVec(side);
-        // Écart assez large pour que les étiquettes « 1.1 », « 1.2 » au bout des traits ne se chevauchent pas.
-        const spacing = pointy ? 14 : 18;
-        free.forEach((o, i) => {
-          const [ax, ay] = anchor(box, side, sideOffset(e, side, ch) + (i - (free.length - 1) / 2) * spacing);
+        // Même place que si la sortie était reliée : jamais sur une autre sortie.
+        free.forEach((o) => {
+          const [ax, ay] = anchor(box, side, sideOffset(e, side, ch) + portOffset(e, box, ch, dir, o.num));
           stubs.push({
             key: `${e.id}-${ch}-${dir}-${o.num}`,
             ref: { eq: e.id, ch, dir, num: o.num },
@@ -430,9 +498,13 @@ export function handlePositions(eq: Eq, box: Box, dir: Dir): { ch: number; at: P
   const [vx, vy] = flowVec(side);
   return eq.channels.map((c, i) => {
     const [ax, ay] = channelAnchor(eq, box, side, i + 1);
-    const used = c.outputs.some((o) => o.dir === dir);
-    const lat = used ? 20 : 0;
-    const out = used ? 18 : 26;
+    const count = c.outputs.filter((o) => o.dir === dir).length;
+    const used = count > 0;
+    // À la place de la sortie suivante, un peu au-delà du bout des traits.
+    // Plusieurs canaux : pas de place entre les axes, le « + » s'éloigne au-delà des étiquettes.
+    const multi = eq.channels.length > 1;
+    const lat = used && !multi ? slot(eq, box, count, count + 1) : 0;
+    const out = !used ? 26 : multi ? 48 : 34;
     return { ch: i + 1, at: [ax + vx * out + (vx === 0 ? lat : 0), ay + vy * out + (vy === 0 ? lat : 0)] as Pt };
   });
 }

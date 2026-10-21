@@ -389,7 +389,7 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
                                 <line x1={0} y1={4} x2={22} y2={4} stroke={outputColor(o.num)} strokeWidth={2} strokeDasharray={dir === 'arriere' ? '4 3' : undefined} />
                               </svg>
                               <span className="mono" style={{ width: 30, font: '600 12px var(--font-tag)' }}>{out}</span>
-                              <span style={{ width: 120, color: 'var(--text-secondary)' }}>{tx(dir === 'avant' ? L.forward : L.reverse)} · {polarity(o.num)}</span>
+                              <span style={{ width: 120, color: 'var(--text-secondary)' }}>{tx(dir === 'avant' ? L.forward : L.reverse)} · {polarity(o.num, outs.length)}</span>
                               {l ? (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <button type="button" onClick={() => onSelect(l.to.eq)} className="abi-link" title={tx(L.openTarget)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--abi-green)', font: '600 12px var(--font-tag)' }}>

@@ -4,7 +4,7 @@ import { boxAt, eqBox, flowVec, hg0Of, opposite, overlaps, sideOffset, sizeOf, s
 import { PIVOT_FORMAT, uid, type Chute, type Dir, type Eq, type Flow, type Link, type OutputRef, type Pivot } from './pivot';
 import {
   defaultOptions, defaultSetpoints, defaultStack, chainOf, hgDef, proximityOf, makeHg,
-  nextOutputNum, normalizeChain, suggestRepere, zoneOf, MAX, canAddChannel, canAddOutput,
+  chainRepere, nextOutputNum, normalizeChain, suggestRepere, zoneOf, MAX, canAddChannel, canAddOutput,
   freeOutputNum, reverseBlocked,
 } from './rules';
 import { symbolOf } from './symbols';
@@ -122,11 +122,13 @@ export function placeNext(p: Pivot, src: Eq, dir: Dir, hg0: string, ch: number):
 export function addOutputWithNext(cat: Catalogue, p: Pivot, eqId: string, ch: number, dir: Dir, hg0: string, at?: { x: number; y: number }): { p: Pivot; id: string | null } {
   const src = findEq(p, eqId);
   if (!src) return { p, id: null };
-  const r = takeOutput(p, eqId, ch, dir);
+  // Le « + » ajoute toujours une nouvelle sortie (celle qu'il annonce) ; une sortie en attente se
+  // raccorde depuis elle-même.
+  const r = addOutput(p, eqId, ch, dir);
   if (!r.ref) return { p, id: null };
   const pos = at ?? placeNext(r.p, src, dir, hg0, ch);
   const flow = dir === 'avant' ? src.flow : opposite(src.flow);
-  const made = addEq(cat, r.p, hg0, pos.x, pos.y, { flow, zone: zoneOf(src.repere) });
+  const made = addEq(cat, r.p, hg0, pos.x, pos.y, { flow, zone: zoneOf(src.repere), repere: chainRepere(r.p, src, hg0) });
   return { p: connect(made.p, r.ref, { eq: made.id, ch: 1 }), id: made.id };
 }
 

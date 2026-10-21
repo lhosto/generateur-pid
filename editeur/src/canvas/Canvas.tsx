@@ -2,18 +2,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Abbr, getLang, hgLabel, plain, rich, tx } from '../i18n';
 import type { Catalogue } from '../model/catalogue';
-import { boxAt, CH_PITCH, channelOffset, CHUTE_SIZE, eqBox, hg0Of, isHorizontal, opposite, snap, SCREEN, type Box } from '../model/geometry';
+import { boxAt, CH_PITCH, channelOffset, CHUTE_SIZE, eqBox, hg0Of, flowVec, isHorizontal, opposite, snap, SCREEN, type Box } from '../model/geometry';
 import { axisCandidates } from '../model/straighten';
 import { guideSnap } from '../model/align';
 import {
-  addChannel, addChute, addEq, addOutputWithNext, takeOutput, connect, removeLink, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
+  addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, removeLink, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
   placeNext, setLinkTarget,
 } from '../model/ops';
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
 import { handlePositions, loopLinks, outputColor, outputTag, placeTags, shortTag, routeAll, tagAnchor, type Pt } from '../model/route';
 import {
   canAddChannel, canAddOutput, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
-  zoneOf,
+  chainRepere, zoneOf,
 } from '../model/rules';
 import { Icon } from '../ui/ui';
 import { Glyph } from '../panels/Palette';
@@ -512,7 +512,7 @@ export function Canvas(props: Props) {
         return force((n) => n + 1);
       }
       if (target) {
-        const o = d.ref ? { p: pv, ref: d.ref } : takeOutput(pv, src.id, d.src.ch, d.src.dir);
+        const o = d.ref ? { p: pv, ref: d.ref } : addOutput(pv, src.id, d.src.ch, d.src.dir);
         if (o.ref) commit(connect(o.p, o.ref, { eq: target.id, ch: d.targetCh }));
       } else if (d.mode === 'new' || d.ref) {
         // Lâché dans le vide : même menu, l'équipement choisi sera posé à cet endroit.
@@ -538,7 +538,7 @@ export function Canvas(props: Props) {
       if (!exists || pv.links.some((l) => sameOutput(l.from, ref))) return;
       // Même sens que le « + » : une sortie arrière repart à contre-flux.
       const flow = ref.dir === 'avant' ? src.flow : opposite(src.flow);
-      const made = addEq(cat, pv, hg0, at[0], at[1], { flow, zone: zoneOf(src.repere) });
+      const made = addEq(cat, pv, hg0, at[0], at[1], { flow, zone: zoneOf(src.repere), repere: chainRepere(pv, src, hg0) });
       next = { p: connect(made.p, ref, { eq: made.id, ch: 1 }), id: made.id };
     } else {
       next = addOutputWithNext(cat, pv, src.id, m.src.ch, m.src.dir, hg0, m.at ? { x: m.at[0], y: m.at[1] } : undefined);
@@ -614,7 +614,7 @@ export function Canvas(props: Props) {
     const fwd = lk.from.dir === 'avant';
     return [
       { text: tx(L.linkTitle, ra, rb), kind: 'title' },
-      { text: tx(L.linkSub, lk.from.num, fwd, polarity(lk.from.num), lk.from.ch, (a?.channels.length ?? 1) > 1, lk.to.ch, (b?.channels.length ?? 1) > 1), kind: 'sub' },
+      { text: tx(L.linkSub, lk.from.num, fwd, polarity(lk.from.num, a ? outputsOf(a, lk.from.ch, lk.from.dir).length : 1), lk.from.ch, (a?.channels.length ?? 1) > 1, lk.to.ch, (b?.channels.length ?? 1) > 1), kind: 'sub' },
       ...(loops.has(lk.id) ? [{ text: tx(L.loop), kind: 'sub' as const }] : []),
       { text: `${ra}_CH${pad2(lk.from.ch)} · S${lk.from.num} → ${rb}_CH${pad2(lk.to.ch)}`, kind: 'tech' },
       { text: rich(tx(L.linkHint)), kind: 'hint' },
@@ -626,7 +626,7 @@ export function Canvas(props: Props) {
     const ra = a?.repere || '?';
     return [
       { text: tx(L.stubTitle, ref.num, ref.dir === 'avant'), kind: 'title' },
-      { text: tx(L.outSub, polarity(ref.num), ref.ch, (a?.channels.length ?? 1) > 1), kind: 'sub' },
+      { text: tx(L.outSub, polarity(ref.num, a ? outputsOf(a, ref.ch, ref.dir).length : 1), ref.ch, (a?.channels.length ?? 1) > 1), kind: 'sub' },
       { text: `${ra}_CH${pad2(ref.ch)} · S${ref.num}`, kind: 'tech' },
       { text: rich(tx(L.stubHint)), kind: 'hint' },
     ];
@@ -1051,7 +1051,7 @@ function Handles(props: {
     const lines: TipLine[] = ok
       ? [
           { text: tx(L.outTitle, num, dir === 'avant'), kind: 'title' },
-          { text: tx(L.outSub, polarity(num), ch, n > 1), kind: 'sub' },
+          { text: tx(L.outSub, polarity(num, outputsOf(eq, ch, dir).length + 1), ch, n > 1), kind: 'sub' },
           { text: `${eq.repere || '?'}_CH${pad2(ch)} · S${num}`, kind: 'tech' },
           { text: tx(L.addClick), kind: 'hint' },
           { text: tx(L.addDrag), kind: 'hint' },
@@ -1070,13 +1070,15 @@ function Handles(props: {
           props.onTipEnd();
           props.onWire(e, { eq: eq.id, ch, dir }, at);
         }}
-        style={{ cursor: ok ? 'pointer' : 'not-allowed' }}
+        // Indisponible (marche arrière non programmée) : à peine visible, l'infobulle explique au survol.
+        style={{ cursor: ok ? 'pointer' : 'not-allowed', opacity: ok ? 1 : 0.3 }}
       >
         <circle cx={at[0]} cy={at[1]} r={11} fill="transparent" />
         <circle cx={at[0]} cy={at[1]} r={7.5} fill="var(--pid-band)" stroke={ok ? 'var(--abi-green)' : '#6f7a74'} strokeWidth={1.5} strokeDasharray={dir === 'arriere' ? '2.5 2' : undefined} />
         <path d={`M${at[0] - 3.5} ${at[1]} h7 M${at[0]} ${at[1] - 3.5} v7`} stroke={ok ? '#fff' : '#6f7a74'} strokeWidth={1.5} strokeLinecap="round" />
-        {n > 1 && (
-          <text x={at[0]} y={at[1] - 11} textAnchor="middle" style={{ font: '600 8px var(--font-tag)', fill: 'var(--pid-caption)', pointerEvents: 'none' }}>
+        {n > 1 && ok && (
+          // Numéro du canal à l'extérieur du « + », dans le sens de la sortie (pas sur le « + » voisin).
+          <text x={at[0] + flowVec(dir === 'avant' ? eq.flow : opposite(eq.flow))[0] * 13} y={at[1] + flowVec(dir === 'avant' ? eq.flow : opposite(eq.flow))[1] * 13} textAnchor="middle" dominantBaseline="central" style={{ font: '600 8px var(--font-tag)', fill: 'var(--pid-caption)', pointerEvents: 'none' }}>
             {ch}
           </text>
         )}

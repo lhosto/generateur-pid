@@ -35,9 +35,9 @@ export function sizeOf(base: Base, channels: number, flow: Flow): { w: number; h
   const [w, h] = BASE_SIZE[base];
   const extra = Math.max(0, channels - 1) * CH_PITCH;
   if (ORIENTED.has(base)) {
-    // Longueur le long du flux, épaisseur = canaux ; la longueur suit aussi les canaux pour que la forme
-    // reste nettement allongée dans le sens du flux. À la verticale, un peu plus épais pour le repère.
-    const len = w + extra;
+    // Longueur le long du flux, fixe ; épaisseur = canaux (plus de canaux = plus haut, pas plus long).
+    // À la verticale, un peu plus épais pour le repère.
+    const len = w;
     return isHorizontal(flow) ? { w: len, h: h + extra } : { w: h + 8 + extra, h: len };
   }
   return isHorizontal(flow) ? { w, h: h + extra } : { w: w + extra, h };
