@@ -28,9 +28,18 @@ export const isHorizontal = (f: Flow) => f === 'E' || f === 'W';
 export const hg0Of = (eq: Pick<Eq, 'hg'>) => eq.hg[0]?.type ?? '';
 export const baseOf = (eq: Pick<Eq, 'hg'>): Base => symbolOf(hg0Of(eq)).base;
 
+/** Formes allongées : elles s'orientent dans le sens du flux (un tapis qui descend est vertical). */
+const ORIENTED = new Set<Base>(['pill', 'card', 'screen', 'grid', 'para']);
+
 export function sizeOf(base: Base, channels: number, flow: Flow): { w: number; h: number } {
   const [w, h] = BASE_SIZE[base];
   const extra = Math.max(0, channels - 1) * CH_PITCH;
+  if (ORIENTED.has(base)) {
+    // Longueur le long du flux, épaisseur = canaux ; la longueur suit aussi les canaux pour que la forme
+    // reste nettement allongée dans le sens du flux. À la verticale, un peu plus épais pour le repère.
+    const len = w + extra;
+    return isHorizontal(flow) ? { w: len, h: h + extra } : { w: h + 8 + extra, h: len };
+  }
   return isHorizontal(flow) ? { w, h: h + extra } : { w: w + extra, h };
 }
 

@@ -22,6 +22,7 @@ const L = {
   reverse: { fr: 'arrière', en: 'reverse' },
   noRepere: { fr: 'Repère client manquant', en: 'Customer tag missing' },
   dupRepere: { fr: (r: string) => 'Repère client en double : ' + r, en: (r: string) => 'Duplicate customer tag: ' + r },
+  dupAktid: { fr: (r: string) => 'Repère Aktid en double : ' + r, en: (r: string) => 'Duplicate Aktid tag: ' + r },
   noHs: { fr: (n: string) => `${n} : matériel spécifique [HS] à choisir`, en: (n: string) => `${n}: Hardware Specific [HS] not selected` },
   tooManyHg: { fr: (n: number) => `Plus de ${n} matériels génériques [HG]`, en: (n: number) => `More than ${n} Hardware Generic items [HG]` },
   kmReverse: { fr: 'Sortie marche arrière avec une commande KM', en: 'Reverse output with KM control' },
@@ -140,6 +141,8 @@ export function nextOutputNum(eq: Eq, ch: number, dir: Dir): number | null {
 }
 
 export function canAddOutput(eq: Eq, ch: number, dir: Dir): boolean {
+  // Canal absent (retiré entre-temps, par ex. menu du « + » resté ouvert) : aucune sortie possible.
+  if (!eq.channels[ch - 1]) return false;
   if (dir === 'arriere' && reverseBlocked(eq)) return false;
   return nextOutputNum(eq, ch, dir) !== null;
 }
@@ -187,11 +190,22 @@ export function defaultOptions(cat: Catalogue): Record<string, boolean | number>
   return o;
 }
 
+/**
+ * Autres équipements qui portent déjà ce repère (client ou Aktid). Comparaison sans tenir compte de la
+ * casse ni des espaces autour : 08Aa et 08AA nommeraient les mêmes blocs TIA. Repère vide : aucun doublon.
+ */
+export function repereUsers(p: Pivot, eqId: string, kind: 'client' | 'aktid', value: string): Eq[] {
+  const v = value.trim().toLowerCase();
+  if (!v) return [];
+  return p.equipments.filter((o) => o.id !== eqId && (kind === 'client' ? o.repere : o.repereAktid).trim().toLowerCase() === v);
+}
+
 /** Raisons pour lesquelles un EQ n'est pas encore utilisable par le générateur (textes à marqueurs, voir L). */
 export function incompleteReasons(cat: Catalogue, p: Pivot, eq: Eq): string[] {
   const r: string[] = [];
   if (!eq.repere.trim()) r.push(tx(L.noRepere));
-  else if (p.equipments.some((o) => o.id !== eq.id && o.repere === eq.repere)) r.push(tx(L.dupRepere, eq.repere));
+  else if (repereUsers(p, eq.id, 'client', eq.repere).length) r.push(tx(L.dupRepere, eq.repere));
+  if (repereUsers(p, eq.id, 'aktid', eq.repereAktid).length) r.push(tx(L.dupAktid, eq.repereAktid.trim()));
   for (const h of eq.hg) {
     const d = hgDef(cat, h.type);
     if (d.hs.length > 0 && !h.hs) r.push(tx(L.noHs, hgName(eq, h)));
@@ -208,11 +222,12 @@ export function incompleteReasons(cat: Catalogue, p: Pivot, eq: Eq): string[] {
 export function suggestRepere(cat: Catalogue, p: Pivot, hg0: string, zoneHint?: string): string {
   const prefix = cat.prefixes[hg0] ?? '99';
   const zone = zoneHint && /^[A-Z]$/.test(zoneHint) ? zoneHint : 'A';
-  const used = new Set(p.equipments.map((e) => e.repere));
+  // Même comparaison que les doublons (repereUsers) : sans casse ni espaces, sinon 08AA ferait proposer 08Aa.
+  const used = new Set(p.equipments.map((e) => e.repere.trim().toLowerCase()));
   for (let i = 0; i < 26 * 27; i++) {
     const suffix = i < 26 ? String.fromCharCode(97 + i) : String.fromCharCode(96 + Math.floor(i / 26)) + String.fromCharCode(97 + (i % 26));
     const r = prefix + zone + suffix;
-    if (!used.has(r)) return r;
+    if (!used.has(r.toLowerCase())) return r;
   }
   return prefix + zone + '?';
 }

@@ -51,8 +51,8 @@ const L = {
   opened: { fr: (name: string) => 'Pivot ouvert : ' + name, en: (name: string) => 'Pivot opened: ' + name },
   alreadyStraight: { fr: 'Liens déjà droits', en: 'Links already straight' },
   straightened: { fr: 'Liens redressés', en: 'Links straightened' },
-  // Choix sur la planche des symboles : ce que poseront les poignées « + » (ex-« HG0 des gestes + »).
-  plusNature: { fr: (label: string) => 'Les « + » poseront désormais : ' + label, en: (label: string) => 'The “+” handles will now place: ' + label },
+  // Choix sur la planche des symboles : proposé en « dernier choix » dans le menu des « + », après le convoyeur.
+  plusNature: { fr: (label: string) => 'Proposé dans le menu des « + » : ' + label, en: (label: string) => 'Offered in the “+” menu: ' + label },
   // Barre d'état
   hgList: { fr: 'Liste des matériels génériques', en: 'Hardware Generic list' },
   hgListInfo: {
@@ -92,7 +92,8 @@ export function App() {
   const fitted = useRef(false);
   const [drawer, setDrawer] = useState<string | null>(null);
   const [current, setCurrent] = useState('BELT');
-  const [sheet, setSheet] = useState(false);
+  // Planche des HG principaux : consultation (HG proposé dans le menu des « + ») ou choix de l'équipement à ajouter.
+  const [sheet, setSheet] = useState<null | { pick?: (hg0: string) => void }>(null);
   const [grid, setGrid] = useState(true);
   // Rapport fictif : pivot au moment du clic ; les messages sont recalculés au changement de langue.
   const [reportSrc, setReportSrc] = useState<Pivot | null>(null);
@@ -223,10 +224,10 @@ export function App() {
   const eqName = (id: string) => findEq(pivot, id)?.repere ?? '?';
   const base = pivot.site.base;
   const drive = cat.hgTypes.DRIV.hs.find((x) => x.id === base.hs.DRIV)?.label;
-  // Planche des symboles : le HG choisi devient celui que posent les « + » (libellé simple, code en petit).
+  // Planche des symboles : le HG choisi est proposé dans le menu des « + » (libellé simple, code en petit).
   const pickNature = (k: string) => {
     setCurrent(k);
-    setSheet(false);
+    setSheet(null);
     say(<>{tx(L.plusNature, cat.hgTypes[k] ? hgLabel(cat.hgTypes[k]) : k)}<Abbr>{k}</Abbr></>);
   };
 
@@ -302,7 +303,7 @@ export function App() {
 
       {tab === 'pid' && (
         <main style={{ display: 'grid', gridTemplateColumns: '236px 1fr', minHeight: 0 }}>
-          <Palette cat={cat} current={current} onCurrent={setCurrent} onPlace={placeCenter} onSymbols={() => setSheet(true)} />
+          <Palette cat={cat} current={current} onCurrent={setCurrent} onPlace={placeCenter} onSymbols={() => setSheet({})} />
           <div style={{ position: 'relative', minWidth: 0, minHeight: 0 }}>
             <Canvas
               cat={cat}
@@ -319,6 +320,8 @@ export function App() {
               grid={grid}
               onOpenEq={setDrawer}
               onSize={onSize}
+              onPickOther={(apply) => setSheet({ pick: apply })}
+              onChosen={setCurrent}
             />
             <ZoomBar view={view} onZoom={zoomBy} onFit={fit} grid={grid} onGrid={() => setGrid(!grid)} onStraighten={() => straightenAll()} />
             {selCount >= 2 && <AlignBar count={selCount} onAlign={onAlign} onDistribute={onDistribute} onStraighten={() => straightenAll(new Set(sel.eqs))} />}
@@ -366,7 +369,18 @@ export function App() {
         </span>
       </footer>
 
-      {sheet && <SymbolSheet cat={cat} onClose={() => setSheet(false)} onPick={pickNature} />}
+      {sheet && (
+        <SymbolSheet
+          cat={cat}
+          mode={sheet.pick ? 'pick' : 'browse'}
+          onClose={() => setSheet(null)}
+          onPick={(k) => {
+            if (!sheet.pick) return pickNature(k);
+            setSheet(null);
+            sheet.pick(k);
+          }}
+        />
+      )}
       {baseOpen && <BaseSettingsDialog cat={cat} base={base} onClose={() => setBaseOpen(false)} onApply={(b) => { commit(setBase(pivot, b)); setBaseOpen(false); say(<Term k="eq" plural before={tx(L.baseApplied)} />); }} />}
     </div>
   );

@@ -58,7 +58,8 @@ export function addEq(cat: Catalogue, p: Pivot, hg0: string, x: number, y: numbe
 /** Une sortie mène à un seul canal : relier remplace le lien existant de cette sortie. */
 export function connect(p: Pivot, from: OutputRef, to: { eq: string; ch: number }): Pivot {
   const src = findEq(p, from.eq);
-  if (!src) return p;
+  // Canal de départ absent : pas de lien orphelin dans le pivot envoyé au générateur.
+  if (!src || !src.channels[from.ch - 1]) return p;
   const has = src.channels[from.ch - 1]?.outputs.some((o) => o.dir === from.dir && o.num === from.num);
   let next = p;
   if (!has) {
@@ -228,7 +229,7 @@ export function removeHg(p: Pivot, eqId: string, hgId: string): Pivot {
   return touch({ ...mapEq(p, eqId, (e) => ({ ...e, hg: e.hg.filter((h) => h.id !== hgId) })), safety: { ...p.safety, inputs } });
 }
 
-/** Dupliquer : mêmes réglages, nouveaux repères ; les liens ne sont pas recopiés. */
+/** Dupliquer : mêmes réglages, nouveaux repères (client proposé, Aktid vide) ; les liens ne sont pas recopiés. */
 export function duplicate(cat: Catalogue, p: Pivot, eqIds: string[]): { p: Pivot; ids: string[] } {
   let next = p;
   const ids: string[] = [];
@@ -239,6 +240,8 @@ export function duplicate(cat: Catalogue, p: Pivot, eqIds: string[]): { p: Pivot
       ...structuredClone(e),
       id: uid('eq'),
       repere: suggestRepere(cat, next, hg0Of(e), zoneOf(e.repere)),
+      // Le repère Aktid est propre à chaque équipement : le recopier créerait un doublon.
+      repereAktid: '',
       x: e.x + 40,
       y: e.y + 40,
       hg: e.hg.map((h) => ({ ...h, id: uid('hg') })),

@@ -1,8 +1,8 @@
 // Canevas PID : écran Unified 1920×1080, zoom/déplacement, sélection, gestes « + », liens.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getLang, hgLabel, plain, rich, tx } from '../i18n';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Abbr, getLang, hgLabel, plain, rich, tx } from '../i18n';
 import type { Catalogue } from '../model/catalogue';
-import { boxAt, CH_PITCH, channelOffset, CHUTE_SIZE, eqBox, hg0Of, isHorizontal, snap, SCREEN, type Box } from '../model/geometry';
+import { boxAt, CH_PITCH, channelOffset, CHUTE_SIZE, eqBox, hg0Of, isHorizontal, opposite, snap, SCREEN, type Box } from '../model/geometry';
 import { axisCandidates } from '../model/straighten';
 import { guideSnap } from '../model/align';
 import {
@@ -12,10 +12,11 @@ import {
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
 import { handlePositions, outputColor, routeAll, type Pt } from '../model/route';
 import {
-  canAddChannel, canAddOutput, hgDef, isNoAction, nextOutputNum, outputLabel, pad2, reverseBlocked,
+  canAddChannel, canAddOutput, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
   zoneOf,
 } from '../model/rules';
 import { Icon } from '../ui/ui';
+import { Glyph } from '../panels/Palette';
 import { EqNode } from './EqNode';
 import { ChuteShape } from './symbols';
 
@@ -48,6 +49,10 @@ interface Props {
   grid: boolean;
   onOpenEq: (id: string) => void;
   onSize: (w: number, h: number) => void;
+  /** Ouvre la planche des HG principaux pour choisir l'équipement à ajouter. */
+  onPickOther: (apply: (hg0: string) => void) => void;
+  /** Mémorise le dernier HG principal choisi autre que le convoyeur (« dernier choix » du menu du « + »). */
+  onChosen: (hg0: string) => void;
 }
 
 type Drag =
@@ -56,14 +61,49 @@ type Drag =
   | { kind: 'move'; start: Pivot; a: Pt; eqs: string[]; chutes: string[]; primary: Pt; primaryId: string | null; moved: boolean; clicked: string | null }
   | { kind: 'wire'; mode: 'new' | 'stub' | 'retarget'; src: { eq: string; ch: number; dir: Dir }; ref?: OutputRef; linkId?: string; a: Pt; cur: Pt; moved: boolean; target: string | null; targetCh: number; origin: Pt };
 
+/** Ligne d'infobulle : titre en phrase simple, détail, nom technique (petit), aide, alertes. */
+type TipKind = 'title' | 'sub' | 'tech' | 'hint' | 'warn' | 'fault';
+interface TipLine {
+  text: ReactNode;
+  kind?: TipKind;
+}
 interface Tip {
   source: 'eq' | 'pointer';
   x: number;
   y: number;
-  lines: { text: ReactNode; tone?: 'warn' | 'fault' | 'dim' }[];
+  lines: TipLine[];
 }
 
+/** Menu du « + » d'une sortie : choisir l'équipement à ajouter. */
+interface AddMenu {
+  x: number;
+  y: number;
+  src: { eq: string; ch: number; dir: Dir };
+  /** Point de dépôt (geste glissé dans le vide) ; sinon placement automatique. */
+  at?: Pt;
+  /** Sortie libre existante à raccorder (au lieu d'en créer une). */
+  ref?: OutputRef;
+}
+
+const TIP_STYLE: Record<TipKind, React.CSSProperties> = {
+  title: { font: '600 13px var(--font-sans)', color: '#fff' },
+  sub: { font: '400 12px var(--font-sans)', color: 'var(--text-secondary)' },
+  tech: { font: '500 10.5px var(--font-tag)', color: 'var(--text-muted)', letterSpacing: '.02em' },
+  hint: { font: '400 12px var(--font-sans)', color: 'var(--text-muted)' },
+  warn: { font: '400 12px var(--font-sans)', color: 'var(--pid-warn)' },
+  fault: { font: '400 12px var(--font-sans)', color: 'var(--pid-fault-stroke)' },
+};
+
 const FIT_PAD = 28;
+
+/** Équipement proposé en tête du menu du « + ». */
+const DEFAULT_NEXT = 'BELT';
+
+/**
+ * Onglet des canaux « − n canaux + », posé hors de la forme : au-dessus en flux horizontal, à droite en flux
+ * vertical (le haut y est pris par les « + » des sorties). L'écart rejoint la zone de clic de l'équipement.
+ */
+const TAB = { w: 76, h: 16, gap: 4 };
 
 // Textes du canevas : français pour l'opérateur, anglais préparé.
 // « [CH] » dans un texte = terme technique affiché en petit après le mot simple (voir i18n.rich).
@@ -99,6 +139,37 @@ const L = {
     en: (n: number) => `${n} incoming link${n > 1 ? 's' : ''} deleted`,
   },
   emptyChannel: { fr: 'Canal vide', en: 'Empty Channel' },
+  outTitle: {
+    fr: (n: number, fwd: boolean) => `Sortie ${n} vers l’${fwd ? 'avant' : 'arrière'}`,
+    en: (n: number, fwd: boolean) => `Output ${n}, ${fwd ? 'forward' : 'reverse'}`,
+  },
+  outSub: {
+    fr: (pol: string, ch: number, multi: boolean) => `${multi ? `Canal ${ch} · ` : ''}sortie ${pol}`,
+    en: (pol: string, ch: number, multi: boolean) => `${multi ? `Channel ${ch} · ` : ''}${pol} output`,
+  },
+  addClick: { fr: 'Clic : choisir l’équipement à ajouter, déjà relié', en: 'Click: choose the Equipment item to add, already linked' },
+  addDrag: { fr: 'Glisser : relier à un équipement existant', en: 'Drag: link to an existing Equipment item' },
+  reverseOff: { fr: 'Sortie vers l’arrière indisponible', en: 'Reverse output unavailable' },
+  linkTitle: { fr: (a: string, b: string) => `De ${a} vers ${b}`, en: (a: string, b: string) => `From ${a} to ${b}` },
+  linkSub: {
+    fr: (n: number, fwd: boolean, pol: string, ch: number, multi: boolean, toCh: number, toMulti: boolean) =>
+      `Sortie ${n} vers l’${fwd ? 'avant' : 'arrière'} (${pol})${multi ? `, canal ${ch}` : ''}${toMulti ? ` → arrive dans le canal ${toCh}` : ''}`,
+    en: (n: number, fwd: boolean, pol: string, ch: number, multi: boolean, toCh: number, toMulti: boolean) =>
+      `Output ${n}, ${fwd ? 'forward' : 'reverse'} (${pol})${multi ? `, channel ${ch}` : ''}${toMulti ? ` → into channel ${toCh}` : ''}`,
+  },
+  stubTitle: { fr: (n: number, fwd: boolean) => `Sortie ${n} vers l’${fwd ? 'avant' : 'arrière'}, non reliée`, en: (n: number, fwd: boolean) => `Output ${n}, ${fwd ? 'forward' : 'reverse'}, not connected` },
+  nbChannels: { fr: (n: number) => (n > 1 ? `${n} canaux` : '1 canal'), en: (n: number) => (n > 1 ? `${n} channels` : '1 channel') },
+  nbHg: { fr: (n: number) => `${n} matériel${n > 1 ? 's' : ''}`, en: (n: number) => `${n} hardware item${n > 1 ? 's' : ''}` },
+  tabAdd: { fr: (n: number) => `Ajouter un canal (passer à ${n})`, en: (n: number) => `Add a channel (go to ${n})` },
+  tabRemove: { fr: (n: number) => `Retirer le canal ${n}`, en: (n: number) => `Remove channel ${n}` },
+  tabMax: { fr: (n: number) => `${n} canaux au maximum`, en: (n: number) => `${n} channels at most` },
+  tabMin: { fr: 'Un équipement garde au moins un canal', en: 'An Equipment item keeps at least one channel' },
+  tabWhat: { fr: 'Canaux [CH] : voies de matière de l’équipement', en: 'Channels [CH]: material lanes of the Equipment item' },
+  menuTitle: { fr: (r: string) => `Ajouter après ${r}`, en: (r: string) => `Add after ${r}` },
+  menuDefault: { fr: 'par défaut', en: 'default' },
+  menuLast: { fr: 'dernier choix', en: 'last choice' },
+  menuOther: { fr: 'Autre équipement…', en: 'Other Equipment item…' },
+  menuOtherSub: { fr: 'ouvrir la liste complète', en: 'open the full list' },
   undo: { fr: ' · Ctrl+Z pour annuler', en: ' · Ctrl+Z to undo' },
   zoomOut: { fr: 'Zoom arrière', en: 'Zoom out' },
   zoomIn: { fr: 'Zoom avant', en: 'Zoom in' },
@@ -131,6 +202,9 @@ export function Canvas(props: Props) {
   const [guides, setGuides] = useState<{ gx?: number; gy?: number }>({});
   const [tip, setTip] = useState<Tip | null>(null);
   const [hoverLink, setHoverLink] = useState<string | null>(null);
+  const [menu, setMenu] = useState<AddMenu | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
 
   const live = useRef(props);
   live.current = props;
@@ -172,6 +246,37 @@ export function Canvas(props: Props) {
       window.removeEventListener('keyup', up);
     };
   }, []);
+
+  // Menu du « + » : fermé par tout appui hors de lui (équipement, lien, fiche, bibliothèque…), et dès que le
+  // pivot (annuler, « − » de l'onglet…) ou la vue (molette, déplacement) change : il viserait une sortie ou
+  // un point de dépôt qui ne correspondent plus à ce qui est affiché.
+  useEffect(() => {
+    if (!menu) return;
+    const down = (e: PointerEvent) => {
+      if (!(e.target instanceof Node && menuRef.current?.contains(e.target))) setMenu(null);
+    };
+    window.addEventListener('pointerdown', down, true);
+    return () => window.removeEventListener('pointerdown', down, true);
+  }, [menu]);
+  useEffect(() => setMenu(null), [pivot, view]);
+
+  // Menu recadré dans le canevas (ouvert vers le haut / la gauche près des bords), puis focus sur le premier
+  // choix sans faire défiler le conteneur.
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    const h = host.current;
+    if (!menu || !el || !h) return;
+    const w = el.offsetWidth;
+    const hh = el.offsetHeight;
+    const W = h.clientWidth;
+    const H = h.clientHeight;
+    let left = menu.x + 10;
+    let top = menu.y + 10;
+    if (left + w > W - 4) left = menu.x - 10 - w;
+    if (top + hh > H - 4) top = menu.y - 10 - hh;
+    setMenuPos({ left: Math.max(4, Math.min(left, W - 4 - w)), top: Math.max(4, Math.min(top, H - 4 - hh)) });
+    el.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+  }, [menu]);
 
   // Molette = zoom autour du pointeur (écouteur non passif pour bloquer le défilement).
   useEffect(() => {
@@ -226,6 +331,7 @@ export function Canvas(props: Props) {
   };
 
   const onBackgroundDown = (e: React.PointerEvent) => {
+    setMenu(null);
     if (e.button === 1 || space.current) return startPan(e);
     if (e.button !== 0) return;
     const p = toWorld(e.clientX, e.clientY);
@@ -280,6 +386,7 @@ export function Canvas(props: Props) {
     if (e.button !== 0) return;
     const p = toWorld(e.clientX, e.clientY);
     const mode = linkId ? 'retarget' : ref ? 'stub' : 'new';
+    setMenu(null);
     drag.current = { kind: 'wire', mode, src, ref, linkId, a: p, cur: p, moved: false, target: null, targetCh: 1, origin };
     setTip(null);
     capture(e);
@@ -345,7 +452,7 @@ export function Canvas(props: Props) {
     drag.current = null;
     setGuides({});
     if (!d) return;
-    const { cat: c, commit, currentNature } = live.current;
+    const { commit } = live.current;
     const pv = live.current.pivot;
     if (d.kind === 'band') {
       const x0 = Math.min(d.a[0], d.b[0]);
@@ -374,12 +481,11 @@ export function Canvas(props: Props) {
       const src = findEq(pv, d.src.eq);
       if (!src) return;
       const at = toWorld(e.clientX, e.clientY);
+      const r0 = host.current!.getBoundingClientRect();
+      const menuAt = { x: e.clientX - r0.left, y: e.clientY - r0.top };
       if (d.mode === 'new' && !d.moved) {
-        const r = addOutputWithNext(c, pv, src.id, d.src.ch, d.src.dir, currentNature);
-        if (r.id) {
-          commit(r.p);
-          props.setSel({ ...EMPTY_SEL, eqs: [r.id] });
-        }
+        // Clic sur un « + » : petit menu (convoyeur par défaut, dernier choix, autre équipement).
+        setMenu({ ...menuAt, src: d.src });
         force((n) => n + 1);
         return;
       }
@@ -392,19 +498,39 @@ export function Canvas(props: Props) {
       if (target) {
         const o = d.ref ? { p: pv, ref: d.ref } : addOutput(pv, src.id, d.src.ch, d.src.dir);
         if (o.ref) commit(connect(o.p, o.ref, { eq: target.id, ch: d.targetCh }));
-      } else if (d.mode === 'new') {
-        const r = addOutputWithNext(c, pv, src.id, d.src.ch, d.src.dir, currentNature, { x: at[0], y: at[1] });
-        if (r.id) {
-          commit(r.p);
-          props.setSel({ ...EMPTY_SEL, eqs: [r.id] });
-        }
-      } else if (d.ref) {
-        const made = addEq(c, pv, currentNature, at[0], at[1], { flow: src.flow });
-        commit(connect(made.p, d.ref, { eq: made.id, ch: 1 }));
-        props.setSel({ ...EMPTY_SEL, eqs: [made.id] });
+      } else if (d.mode === 'new' || d.ref) {
+        // Lâché dans le vide : même menu, l'équipement choisi sera posé à cet endroit.
+        setMenu({ ...menuAt, src: d.src, at, ref: d.ref });
       }
       force((n) => n + 1);
     }
+  };
+
+  /** Crée l'équipement choisi dans le menu du « + », déjà raccordé à la sortie. */
+  const addFromMenu = (m: AddMenu, hg0: string) => {
+    const pv = live.current.pivot;
+    const src = findEq(pv, m.src.eq);
+    setMenu(null);
+    // Le pivot a pu changer depuis l'ouverture du menu (planche « Autre équipement… », annuler) : la source,
+    // son canal et, pour une sortie libre, la sortie elle-même doivent encore exister.
+    if (!src || !src.channels[m.src.ch - 1]) return;
+    let next: { p: Pivot; id: string | null };
+    if (m.ref && m.at) {
+      const ref = m.ref;
+      const exists = outputsOf(src, ref.ch, ref.dir).some((o) => o.num === ref.num);
+      if (!exists || pv.links.some((l) => sameOutput(l.from, ref))) return;
+      // Même sens que le « + » : une sortie arrière repart à contre-flux.
+      const flow = ref.dir === 'avant' ? src.flow : opposite(src.flow);
+      const made = addEq(cat, pv, hg0, m.at[0], m.at[1], { flow, zone: zoneOf(src.repere) });
+      next = { p: connect(made.p, ref, { eq: made.id, ch: 1 }), id: made.id };
+    } else {
+      next = addOutputWithNext(cat, pv, src.id, m.src.ch, m.src.dir, hg0, m.at ? { x: m.at[0], y: m.at[1] } : undefined);
+    }
+    if (!next.id) return;
+    props.commit(next.p);
+    props.setSel({ ...EMPTY_SEL, eqs: [next.id] });
+    // Le convoyeur est toujours proposé en tête : seul un autre choix devient le « dernier choix ».
+    if (hg0 !== DEFAULT_NEXT) props.onChosen(hg0);
   };
 
   // ---------- dépôt depuis la bibliothèque ----------
@@ -434,19 +560,22 @@ export function Canvas(props: Props) {
     const b = boxes.get(id);
     if (!eq || !b) return;
     const d = hgDef(cat, hg0Of(eq));
-    const stack = eq.hg.map((h) => h.type).join(' · ');
     // Repère et descriptif sont des données : jamais passés à rich.
-    const lines: Tip['lines'] = [
-      { text: <>{`${eq.repere || '?'} — ${eq.descriptif || hgLabel(d)}`}{eq.channels.length > 1 && rich(tx(L.channels, eq.channels.length))}</> },
-      { text: <>{rich(tx(L.hgStack))}{stack}</>, tone: 'dim' },
+    const lines: TipLine[] = [
+      { text: `${eq.repere || '?'} — ${eq.descriptif || hgLabel(d)}`, kind: 'title' },
+      { text: `${hgLabel(d)} · ${tx(L.nbChannels, eq.channels.length)} · ${tx(L.nbHg, eq.hg.length)}`, kind: 'sub' },
+      { text: eq.hg.map((h) => h.type).join(' · '), kind: 'tech' },
     ];
     // Message du rapport et raisons d'incomplétude : textes à marqueurs [HS] (files.ts, rules.ts).
     const f = props.faults.get(id);
-    if (f) lines.push({ text: rich(f), tone: 'fault' });
-    for (const r of props.incomplete.get(id) ?? []) lines.push({ text: rich(r), tone: 'warn' });
-    lines.push({ text: rich(tx(L.openSheet)), tone: 'dim' });
+    if (f) lines.push({ text: rich(f), kind: 'fault' });
+    for (const r of props.incomplete.get(id) ?? []) lines.push({ text: rich(r), kind: 'warn' });
+    lines.push({ text: rich(tx(L.openSheet)), kind: 'hint' });
+    // Au-dessus de ce qui dépasse du haut de la forme, pour ne rien cacher : l'onglet des canaux en flux
+    // horizontal ; en flux vertical, les « + » du haut (à 26 du bord, rayon 11, n° de canal au-dessus).
+    const above = isNoAction(cat, eq) ? 4 : isHorizontal(eq.flow) ? TAB.gap + TAB.h + 2 : eq.channels.length > 1 ? 46 : 39;
     const h = toHost([b.x0, b.y0]);
-    setTip({ source: 'eq', x: h[0], y: h[1] - 10, lines });
+    setTip({ source: 'eq', x: h[0], y: h[1] - 14 - above * view.zoom, lines });
   };
 
   useEffect(() => {
@@ -454,11 +583,35 @@ export function Canvas(props: Props) {
     else setTip((t) => (t?.source === 'eq' ? null : t));
   }, [hover, pivot, view, lang]);
 
-  const pointerTip = (e: React.PointerEvent, text: ReactNode, hint?: ReactNode) => {
+  const pointerTip = (e: React.PointerEvent, lines: TipLine[]) => {
     const r = host.current!.getBoundingClientRect();
-    const lines: Tip['lines'] = [{ text }];
-    if (hint) lines.push({ text: hint, tone: 'dim' });
     setTip({ source: 'pointer', x: e.clientX - r.left + 14, y: e.clientY - r.top + 12, lines });
+  };
+
+  /** Infobulle d'un lien : phrase simple, puis noms techniques en petit. */
+  const linkTip = (lk: { from: OutputRef; to: { eq: string; ch: number } }): TipLine[] => {
+    const a = findEq(pivot, lk.from.eq);
+    const b = findEq(pivot, lk.to.eq);
+    const ra = a?.repere || '?';
+    const rb = b?.repere || '?';
+    const fwd = lk.from.dir === 'avant';
+    return [
+      { text: tx(L.linkTitle, ra, rb), kind: 'title' },
+      { text: tx(L.linkSub, lk.from.num, fwd, polarity(lk.from.num), lk.from.ch, (a?.channels.length ?? 1) > 1, lk.to.ch, (b?.channels.length ?? 1) > 1), kind: 'sub' },
+      { text: `${ra}_CH${pad2(lk.from.ch)} · S${lk.from.num} → ${rb}_CH${pad2(lk.to.ch)}`, kind: 'tech' },
+      { text: rich(tx(L.linkHint)), kind: 'hint' },
+    ];
+  };
+
+  const stubTip = (ref: OutputRef): TipLine[] => {
+    const a = findEq(pivot, ref.eq);
+    const ra = a?.repere || '?';
+    return [
+      { text: tx(L.stubTitle, ref.num, ref.dir === 'avant'), kind: 'title' },
+      { text: tx(L.outSub, polarity(ref.num), ref.ch, (a?.channels.length ?? 1) > 1), kind: 'sub' },
+      { text: `${ra}_CH${pad2(ref.ch)} · S${ref.num}`, kind: 'tech' },
+      { text: rich(tx(L.stubHint)), kind: 'hint' },
+    ];
   };
 
   // ---------- rendu ----------
@@ -534,8 +687,8 @@ export function Canvas(props: Props) {
                     if (e.button === 1 || space.current) return startPan(e);
                     props.setSel({ ...EMPTY_SEL, link: l.id });
                   }}
-                  onPointerEnter={(e) => { setHoverLink(l.id); pointerTip(e, l.label, rich(tx(L.linkHint))); }}
-                  onPointerMove={(e) => hoverLink === l.id && pointerTip(e, l.label, rich(tx(L.linkHint)))}
+                  onPointerEnter={(e) => { setHoverLink(l.id); pointerTip(e, linkTip(l.link)); }}
+                  onPointerMove={(e) => hoverLink === l.id && pointerTip(e, linkTip(l.link))}
                   onPointerLeave={() => { setHoverLink(null); setTip(null); }}
                   style={{ cursor: 'pointer' }}
                 >
@@ -560,7 +713,7 @@ export function Canvas(props: Props) {
                     props.setSel({ ...EMPTY_SEL, stub: s.ref });
                     startWire(e, { eq: s.ref.eq, ch: s.ref.ch, dir: s.ref.dir }, b, s.ref);
                   }}
-                  onPointerEnter={(e) => pointerTip(e, s.label, rich(tx(L.stubHint)))}
+                  onPointerEnter={(e) => pointerTip(e, stubTip(s.ref))}
                   onPointerLeave={() => setTip(null)}
                   style={{ cursor: 'crosshair' }}
                 >
@@ -583,21 +736,6 @@ export function Canvas(props: Props) {
               onHover={setHoverDelayed}
             />
           ))}
-
-          {selLink && !wire && (() => {
-            const tipPt = selLink.points[selLink.points.length - 1];
-            return (
-              <g
-                onPointerDown={(e) => startWire(e, { eq: selLink.link.from.eq, ch: selLink.link.from.ch, dir: selLink.link.from.dir }, selLink.points[0], selLink.link.from, selLink.id)}
-                onPointerEnter={(e) => pointerTip(e, rich(tx(L.retarget)))}
-                onPointerLeave={() => setTip(null)}
-                style={{ cursor: 'crosshair' }}
-              >
-                <circle cx={tipPt[0]} cy={tipPt[1]} r={9} fill="transparent" />
-                <circle cx={tipPt[0]} cy={tipPt[1]} r={5} fill="var(--pid-band)" stroke="var(--pid-select)" strokeWidth={2} />
-              </g>
-            );
-          })()}
 
           {wire && (
             <g pointerEvents="none">
@@ -646,8 +784,25 @@ export function Canvas(props: Props) {
               incomingLast={pivot.links.filter((l) => l.to.eq === handleTarget.id && l.to.ch === handleTarget.channels.length).length}
               onAddChannel={() => props.commit(addChannel(pivot, handleTarget.id))}
               onRemoveChannel={() => props.commit(removeChannel(pivot, handleTarget.id, handleTarget.channels.length))}
+              onBodyDown={(e) => onEqDown(e, handleTarget.id)}
             />
           )}
+
+          {/* Pastille du lien sélectionné : après les poignées, pour rester saisissable sous l'onglet des canaux. */}
+          {selLink && !wire && (() => {
+            const tipPt = selLink.points[selLink.points.length - 1];
+            return (
+              <g
+                onPointerDown={(e) => startWire(e, { eq: selLink.link.from.eq, ch: selLink.link.from.ch, dir: selLink.link.from.dir }, selLink.points[0], selLink.link.from, selLink.id)}
+                onPointerEnter={(e) => pointerTip(e, [{ text: rich(tx(L.retarget)), kind: 'title' }])}
+                onPointerLeave={() => setTip(null)}
+                style={{ cursor: 'crosshair' }}
+              >
+                <circle cx={tipPt[0]} cy={tipPt[1]} r={9} fill="transparent" />
+                <circle cx={tipPt[0]} cy={tipPt[1]} r={5} fill="var(--pid-band)" stroke="var(--pid-select)" strokeWidth={2} />
+              </g>
+            );
+          })()}
 
           {guides.gx !== undefined && <line x1={guides.gx} y1={0} x2={guides.gx} y2={SCREEN.h} stroke="var(--pid-select)" strokeWidth={1 / view.zoom} strokeDasharray="4 4" pointerEvents="none" />}
           {guides.gy !== undefined && <line x1={0} y1={guides.gy} x2={SCREEN.w} y2={guides.gy} stroke="var(--pid-select)" strokeWidth={1 / view.zoom} strokeDasharray="4 4" pointerEvents="none" />}
@@ -667,53 +822,140 @@ export function Canvas(props: Props) {
       </svg>
 
       {tip && (
-        <div style={{ position: 'absolute', left: tip.x, top: tip.y, transform: tip.source === 'eq' ? 'translateY(-100%)' : undefined, maxWidth: 380, padding: '8px 12px', background: 'var(--pid-band)', border: '1px solid #6f7a74', borderRadius: 4, pointerEvents: 'none', zIndex: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ position: 'absolute', left: tip.x, top: tip.y, transform: tip.source === 'eq' ? 'translateY(-100%)' : undefined, width: 'max-content', maxWidth: 380, padding: '8px 12px', background: 'var(--pid-band)', border: '1px solid #6f7a74', borderRadius: 4, pointerEvents: 'none', zIndex: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {tip.lines.map((l, i) => (
-            <span
-              key={i}
-              style={{
-                font: i === 0 ? '600 12px var(--font-tag)' : '400 12px var(--font-sans)',
-                color: l.tone === 'warn' ? 'var(--pid-warn)' : l.tone === 'fault' ? 'var(--pid-fault-stroke)' : l.tone === 'dim' ? 'var(--text-muted)' : 'var(--pid-text)',
-                whiteSpace: 'nowrap',
-              }}
-            >
+            // Retour à la ligne dans les 380 px (descriptif libre, message de rapport) ; la pile de HG coupe n'importe où.
+            <span key={i} style={{ ...TIP_STYLE[l.kind ?? (i === 0 ? 'title' : 'sub')], whiteSpace: 'normal', overflowWrap: l.kind === 'tech' ? 'anywhere' : 'break-word', marginTop: l.kind === 'hint' && tip.lines[i - 1]?.kind !== 'hint' ? 3 : 0 }}>
               {l.text}
             </span>
           ))}
         </div>
       )}
 
+      {menu && (() => {
+        const src = findEq(pivot, menu.src.eq);
+        if (!src) return null;
+        const items: { hg0: string; note: string }[] = [];
+        if (cat.hgTypes[DEFAULT_NEXT]?.principal) items.push({ hg0: DEFAULT_NEXT, note: tx(L.menuDefault) });
+        if (props.currentNature !== DEFAULT_NEXT && cat.hgTypes[props.currentNature]) items.push({ hg0: props.currentNature, note: tx(L.menuLast) });
+        const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '3px 10px 3px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#fff' };
+        const pos = menuPos ?? { left: menu.x + 10, top: menu.y + 10 };
+        // Sortie libre raccordée : son propre numéro ; sinon celui de la sortie qui sera créée.
+        const outNum = menu.ref?.num ?? nextOutputNum(src, menu.src.ch, menu.src.dir) ?? 1;
+        return (
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label={tx(L.menuTitle, src.repere || '?')}
+            onPointerDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              // Les touches restent dans le menu : sinon les raccourcis de l'App s'appliqueraient aussi (Entrée
+              // ouvre la fiche, Échap la ferme, flèches et Suppr agissent sur la sélection, Espace déplace la vue).
+              // Ctrl / Cmd passent (annuler…) : le menu se ferme alors avec le changement du pivot.
+              if (e.ctrlKey || e.metaKey) return;
+              e.stopPropagation();
+              const all = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+              const at = all.indexOf(document.activeElement as HTMLElement);
+              const go = (k: number) => {
+                e.preventDefault();
+                all[(k + all.length) % all.length]?.focus();
+              };
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setMenu(null);
+              } else if (e.key === 'Tab') setMenu(null);
+              else if (e.key === 'ArrowDown') go(at + 1);
+              else if (e.key === 'ArrowUp') go(at < 0 ? -1 : at - 1);
+              else if (e.key === 'Home') go(0);
+              else if (e.key === 'End') go(-1);
+            }}
+            // Au-dessus de la fiche équipement (zIndex 6), sous les notifications (8).
+            style={{ position: 'absolute', left: pos.left, top: pos.top, width: 'max-content', minWidth: 250, background: 'var(--surface-page)', border: '1px solid var(--abi-green)', boxShadow: 'var(--shadow-drawer)', zIndex: 7 }}
+          >
+            <div style={{ padding: '7px 10px', background: 'var(--surface-panel-header)', font: '600 12px var(--font-sans)' }}>
+              {tx(L.menuTitle, src.repere || '?')}
+              <span style={{ ...TIP_STYLE.tech, marginLeft: 8 }}>{tx(L.outTitle, outNum, menu.src.dir === 'avant')}</span>
+            </div>
+            {items.map((it) => (
+              <button key={it.hg0} type="button" role="menuitem" className="abi-row" onClick={() => addFromMenu(menu, it.hg0)} style={row}>
+                <Glyph hg0={it.hg0} width={64} height={38} />
+                <span style={{ display: 'flex', flexDirection: 'column' }}>
+                  {/* Libellé puis code HG en petit, juste après le mot qu'il nomme. */}
+                  <span style={{ font: '500 13px var(--font-sans)' }}>
+                    {hgLabel(cat.hgTypes[it.hg0])}
+                    <Abbr>{it.hg0}</Abbr>
+                  </span>
+                  <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{it.note}</span>
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              role="menuitem"
+              className="abi-row"
+              onClick={() => {
+                const m = menu;
+                setMenu(null);
+                props.onPickOther((hg0) => addFromMenu(m, hg0));
+              }}
+              style={{ ...row, padding: '9px 10px', borderTop: '1px solid var(--border-divider)' }}
+            >
+              <Icon name="grid" size={18} />
+              <span style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ font: '500 13px var(--font-sans)' }}>{tx(L.menuOther)}</span>
+                <span style={{ font: '400 11px var(--font-sans)', color: 'var(--text-muted)' }}>{tx(L.menuOtherSub)}</span>
+              </span>
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
-/** Poignées : « + » sorties avant / arrière par canal, « + » / « − » canal (le « − » retire le dernier canal). */
+/**
+ * Poignées au survol : « + » des sorties (avant / arrière, une par canal) et, hors de la forme (voir TAB),
+ * l'onglet des canaux « − 2 canaux + » (le « − » retire le dernier canal).
+ */
 function Handles(props: {
   cat: Catalogue;
   eq: Eq;
   box: Box;
   onEnter: () => void;
   onLeave: () => void;
-  onTip: (e: React.PointerEvent, text: ReactNode, hint?: ReactNode) => void;
+  onTip: (e: React.PointerEvent, lines: TipLine[]) => void;
   onTipEnd: () => void;
   onWire: (e: React.PointerEvent, src: { eq: string; ch: number; dir: Dir }, origin: Pt) => void;
   incomingLast: number;
   onAddChannel: () => void;
   onRemoveChannel: () => void;
+  /** Appui sur le corps de l'onglet : comme sur l'équipement (sélection, déplacement). */
+  onBodyDown: (e: React.PointerEvent) => void;
 }) {
   const { eq, box } = props;
   if (isNoAction(props.cat, eq)) return null;
+  const n = eq.channels.length;
   const blocked = reverseBlocked(eq);
   const chip = (dir: Dir, ch: number, at: Pt) => {
     const ok = canAddOutput(eq, ch, dir);
     const num = nextOutputNum(eq, ch, dir);
     if (num === null) return null;
-    const text = ok ? outputLabel(eq, ch, dir, num) : rich(blocked ?? tx(L.unavailable));
-    const hint = ok ? rich(tx(L.chipHint)) : undefined;
+    const lines: TipLine[] = ok
+      ? [
+          { text: tx(L.outTitle, num, dir === 'avant'), kind: 'title' },
+          { text: tx(L.outSub, polarity(num), ch, n > 1), kind: 'sub' },
+          { text: `${eq.repere || '?'}_CH${pad2(ch)} · S${num}`, kind: 'tech' },
+          { text: tx(L.addClick), kind: 'hint' },
+          { text: tx(L.addDrag), kind: 'hint' },
+        ]
+      : [
+          { text: tx(L.reverseOff), kind: 'title' },
+          { text: rich(blocked ?? tx(L.unavailable)), kind: 'sub' },
+        ];
     return (
       <g
         key={dir + ch}
-        onPointerEnter={(e) => { props.onEnter(); props.onTip(e, text, hint); }}
+        onPointerEnter={(e) => { props.onEnter(); props.onTip(e, lines); }}
         onPointerLeave={() => { props.onLeave(); props.onTipEnd(); }}
         onPointerDown={(e) => {
           if (!ok) return e.stopPropagation();
@@ -725,7 +967,7 @@ function Handles(props: {
         <circle cx={at[0]} cy={at[1]} r={11} fill="transparent" />
         <circle cx={at[0]} cy={at[1]} r={7.5} fill="var(--pid-band)" stroke={ok ? 'var(--abi-green)' : '#6f7a74'} strokeWidth={1.5} strokeDasharray={dir === 'arriere' ? '2.5 2' : undefined} />
         <path d={`M${at[0] - 3.5} ${at[1]} h7 M${at[0]} ${at[1] - 3.5} v7`} stroke={ok ? '#fff' : '#6f7a74'} strokeWidth={1.5} strokeLinecap="round" />
-        {eq.channels.length > 1 && (
+        {n > 1 && (
           <text x={at[0]} y={at[1] - 11} textAnchor="middle" style={{ font: '600 8px var(--font-tag)', fill: 'var(--pid-caption)', pointerEvents: 'none' }}>
             {ch}
           </text>
@@ -733,43 +975,62 @@ function Handles(props: {
       </g>
     );
   };
-  const n = eq.channels.length;
+
+  // Onglet des canaux, hors de la forme : au-dessus en flux horizontal, à droite en flux vertical.
   const addCh = canAddChannel(eq);
   const rmCh = n > 1;
-  const edge = (k: number): Pt => (isHorizontal(eq.flow) ? [box.cx + k, box.y1] : [box.x1, box.cy + k]);
-  const cAt = edge(addCh && rmCh ? -8 : 0);
-  const mAt = edge(addCh && rmCh ? 8 : 0);
+  const TW = TAB.w;
+  const TH = TAB.h;
+  const hor = isHorizontal(eq.flow);
+  const tx0 = hor ? box.cx - TW / 2 : box.x1 + TAB.gap;
+  const ty0 = hor ? box.y0 - TAB.gap - TH : box.cy - TH / 2;
   const lastOutputs = eq.channels[n - 1]?.outputs.length ?? 0;
-  const loss = [
-    lastOutputs ? tx(L.outputsLost, lastOutputs) : '',
-    props.incomingLast ? tx(L.linksLost, props.incomingLast) : '',
-  ].filter(Boolean).join(' · ');
+  const loss = [lastOutputs ? tx(L.outputsLost, lastOutputs) : '', props.incomingLast ? tx(L.linksLost, props.incomingLast) : ''].filter(Boolean).join(' · ');
+  const btn = (kind: 'minus' | 'plus') => {
+    const ok = kind === 'plus' ? addCh : rmCh;
+    const cx = kind === 'minus' ? tx0 + 9 : tx0 + TW - 9;
+    const cy = ty0 + TH / 2;
+    const lines: TipLine[] =
+      kind === 'plus'
+        ? ok
+          ? [{ text: tx(L.tabAdd, n + 1), kind: 'title' }, { text: rich(tx(L.tabWhat)), kind: 'hint' }]
+          : [{ text: tx(L.tabMax, MAX.channels), kind: 'title' }]
+        : ok
+          ? [{ text: tx(L.tabRemove, n), kind: 'title' }, { text: (loss || tx(L.emptyChannel)) + tx(L.undo), kind: 'sub' }, { text: `${eq.repere || '?'}_CH${pad2(n)}`, kind: 'tech' }]
+          : [{ text: tx(L.tabMin), kind: 'title' }];
+    // Survol : géré par le <g> de l'onglet (passer du bouton au libellé ne doit pas effacer les poignées).
+    // Zone de clic r = 8 : elle reste dans l'onglet, sans déborder sur la forme.
+    return (
+      <g
+        onPointerEnter={(e) => props.onTip(e, lines)}
+        onPointerLeave={props.onTipEnd}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (!ok) return;
+          props.onTipEnd();
+          if (kind === 'plus') props.onAddChannel();
+          else props.onRemoveChannel();
+        }}
+        style={{ cursor: ok ? 'pointer' : 'not-allowed' }}
+      >
+        <circle cx={cx} cy={cy} r={8} fill="transparent" />
+        <circle cx={cx} cy={cy} r={6} fill={ok ? (kind === 'plus' ? 'var(--abi-green-deep)' : 'var(--abi-tint-red)') : 'transparent'} stroke={ok ? (kind === 'plus' ? 'var(--abi-green)' : 'var(--abi-orange)') : '#6f7a74'} strokeWidth={1.2} />
+        <path d={kind === 'plus' ? `M${cx - 3} ${cy}h6M${cx} ${cy - 3}v6` : `M${cx - 3} ${cy}h6`} stroke={ok ? '#fff' : '#6f7a74'} strokeWidth={1.4} strokeLinecap="round" />
+      </g>
+    );
+  };
   return (
     <g>
       {handlePositions(eq, box, 'avant').map((h) => chip('avant', h.ch, h.at))}
       {handlePositions(eq, box, 'arriere').map((h) => chip('arriere', h.ch, h.at))}
-      {addCh && (
-        <g
-          onPointerEnter={(e) => { props.onEnter(); props.onTip(e, rich(tx(L.addChannel, pad2(eq.channels.length + 1)))); }}
-          onPointerLeave={() => { props.onLeave(); props.onTipEnd(); }}
-          onPointerDown={(e) => { e.stopPropagation(); props.onTipEnd(); props.onAddChannel(); }}
-          style={{ cursor: 'pointer' }}
-        >
-          <rect x={cAt[0] - 6} y={cAt[1] - 6} width={12} height={12} rx={2} fill="var(--pid-band)" stroke="var(--abi-green)" strokeWidth={1.2} />
-          <path d={`M${cAt[0] - 3} ${cAt[1]} h6 M${cAt[0]} ${cAt[1] - 3} v6`} stroke="#fff" strokeWidth={1.3} strokeLinecap="round" />
-        </g>
-      )}
-      {rmCh && (
-        <g
-          onPointerEnter={(e) => { props.onEnter(); props.onTip(e, rich(tx(L.removeChannel, pad2(n))), (loss || tx(L.emptyChannel)) + tx(L.undo)); }}
-          onPointerLeave={() => { props.onLeave(); props.onTipEnd(); }}
-          onPointerDown={(e) => { e.stopPropagation(); props.onTipEnd(); props.onRemoveChannel(); }}
-          style={{ cursor: 'pointer' }}
-        >
-          <rect x={mAt[0] - 6} y={mAt[1] - 6} width={12} height={12} rx={2} fill="var(--pid-band)" stroke="var(--abi-orange)" strokeWidth={1.2} />
-          <path d={`M${mAt[0] - 3} ${mAt[1]} h6`} stroke="#fff" strokeWidth={1.3} strokeLinecap="round" />
-        </g>
-      )}
+      <g onPointerEnter={props.onEnter} onPointerLeave={props.onLeave} onPointerDown={props.onBodyDown} style={{ cursor: 'move' }}>
+        <rect x={tx0} y={ty0} width={TW} height={TH} rx={TH / 2} fill="var(--pid-band)" stroke="#6f7a74" strokeWidth={1} />
+        <text x={tx0 + TW / 2} y={ty0 + TH / 2} textAnchor="middle" dominantBaseline="central" style={{ font: '600 9.5px var(--font-sans)', fill: 'var(--pid-text)', pointerEvents: 'none' }}>
+          {tx(L.nbChannels, n)}
+        </text>
+        {btn('minus')}
+        {btn('plus')}
+      </g>
     </g>
   );
 }

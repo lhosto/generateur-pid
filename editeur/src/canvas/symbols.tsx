@@ -24,10 +24,14 @@ const LOOK: Record<Base, { fill: string; stroke: string; sw: number; dash?: stri
 const RADIUS: Partial<Record<Base, number>> = { pill: 5, card: 7, screen: 4, grid: 4, cabinet: 2, unknown: 4 };
 
 /** Pictogramme : à gauche dans les formes allongées, au centre dans losanges et ronds. */
+/** Forme allongée posée à la verticale (flux vers le haut ou le bas). */
+const tall = (b: Box) => b.h > b.w;
+
 function pictoAt(base: Base, b: Box): { x: number; y: number; s: number } | null {
   if (base === 'diamond' || base === 'circle') return { x: b.cx - 6, y: b.cy - 6, s: 1 };
   if (base === 'silo') return { x: b.cx - 4.2, y: b.y1 - 12, s: 0.7 };
   if (base === 'grid' || base === 'hopper') return null;
+  if (tall(b)) return { x: b.cx - 6, y: b.y0 + (base === 'para' ? 10 : 7), s: 1 };
   return { x: b.x0 + (base === 'para' ? 10 : 7), y: b.cy - 6, s: 1 };
 }
 
@@ -37,7 +41,7 @@ export function labelPos(hg0: string, b: Box): { x: number; y: number; outside: 
   if (spec.picto && (spec.base === 'diamond' || spec.base === 'circle')) return { x: b.cx, y: b.y1 + 9, outside: true };
   if (spec.base === 'circle') return { x: b.cx, y: b.cy, outside: false };
   if (spec.base === 'silo') return { x: b.cx, y: b.cy - 4, outside: false };
-  if (spec.picto && pictoAt(spec.base, b)) return { x: b.cx + 7, y: b.cy, outside: false };
+  if (spec.picto && pictoAt(spec.base, b)) return tall(b) ? { x: b.cx, y: b.cy + 7, outside: false } : { x: b.cx + 7, y: b.cy, outside: false };
   return { x: b.cx, y: b.cy, outside: false };
 }
 
@@ -50,7 +54,9 @@ function outline(base: Base, b: Box, p: { fill: string; stroke: string; sw: numb
     case 'diamond':
       return <path d={`M${b.cx} ${b.y0}L${b.x1} ${b.cy}L${b.cx} ${b.y1}L${b.x0} ${b.cy}Z`} {...common} />;
     case 'para':
-      return <path d={`M${b.x0 + 8} ${b.y0}H${b.x1}L${b.x1 - 8} ${b.y1}H${b.x0}Z`} {...common} />;
+      return tall(b)
+        ? <path d={`M${b.x0} ${b.y0 + 8}L${b.x1} ${b.y0}V${b.y1 - 8}L${b.x0} ${b.y1}Z`} {...common} />
+        : <path d={`M${b.x0 + 8} ${b.y0}H${b.x1}L${b.x1 - 8} ${b.y1}H${b.x0}Z`} {...common} />;
     case 'circle':
       return <ellipse cx={b.cx} cy={b.cy} rx={b.w / 2} ry={b.h / 2} {...common} />;
     case 'silo':
@@ -68,10 +74,18 @@ function outline(base: Base, b: Box, p: { fill: string; stroke: string; sw: numb
 function decor(hg0: string, base: Base, b: Box) {
   if (base === 'screen') return <path d={`M${b.x0 + 2} ${b.y1 - 2}L${b.x1 - 2} ${b.y0 + 2}`} stroke="var(--pid-divider)" strokeWidth={1} />;
   if (base === 'grid') {
+    // Disques perpendiculaires au flux, deux lisses dans le sens du flux.
     const d: string[] = [];
-    for (let x = b.x0 + 8; x <= b.x1 - 7; x += 7) d.push(`M${x} ${b.y0 + 6}v${b.h - 12}`);
-    d.push(`M${b.x0 + 4} ${b.cy - 4}h${b.w - 8}`, `M${b.x0 + 4} ${b.cy + 4}h${b.w - 8}`);
-    const thirds = hg0 === 'SCD3' ? `M${b.x0 + b.w / 3} ${b.y0 + 2}V${b.y1 - 2}M${b.x0 + (2 * b.w) / 3} ${b.y0 + 2}V${b.y1 - 2}` : '';
+    let thirds = '';
+    if (tall(b)) {
+      for (let y = b.y0 + 8; y <= b.y1 - 7; y += 7) d.push(`M${b.x0 + 6} ${y}h${b.w - 12}`);
+      d.push(`M${b.cx - 4} ${b.y0 + 4}v${b.h - 8}`, `M${b.cx + 4} ${b.y0 + 4}v${b.h - 8}`);
+      if (hg0 === 'SCD3') thirds = `M${b.x0 + 2} ${b.y0 + b.h / 3}H${b.x1 - 2}M${b.x0 + 2} ${b.y0 + (2 * b.h) / 3}H${b.x1 - 2}`;
+    } else {
+      for (let x = b.x0 + 8; x <= b.x1 - 7; x += 7) d.push(`M${x} ${b.y0 + 6}v${b.h - 12}`);
+      d.push(`M${b.x0 + 4} ${b.cy - 4}h${b.w - 8}`, `M${b.x0 + 4} ${b.cy + 4}h${b.w - 8}`);
+      if (hg0 === 'SCD3') thirds = `M${b.x0 + b.w / 3} ${b.y0 + 2}V${b.y1 - 2}M${b.x0 + (2 * b.w) / 3} ${b.y0 + 2}V${b.y1 - 2}`;
+    }
     return (
       <g>
         <path d={d.join(' ')} stroke="#8d9791" strokeWidth={0.8} />

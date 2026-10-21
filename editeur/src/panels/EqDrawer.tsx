@@ -11,7 +11,7 @@ import type { Dir, Eq, Flow, Pivot } from '../model/pivot';
 import { outputColor } from '../model/route';
 import {
   alternativesAt, canAddChannel, canAddOutput, chainOf, hgDef, hgName, hsLabel, hsName, incompleteReasons, isFirstChannel, isNoAction, MAX,
-  optionLabel, outputsOf, pad2, polarity, proximityChoices, proximityOf, reverseBlocked,
+  optionLabel, outputsOf, pad2, polarity, proximityChoices, proximityOf, repereUsers, reverseBlocked,
 } from '../model/rules';
 import { Button, Field, Icon, inputStyle, SectionHead, Toggle } from '../ui/ui';
 import { Glyph } from './Palette';
@@ -32,6 +32,10 @@ const L = {
   // Identité
   identity: { fr: 'Identité', en: 'Identification' },
   repere: { fr: 'Repère client', en: 'Customer tag' },
+  dupUsed: {
+    fr: (who: string, n: number) => `Déjà utilisé par ${n > 1 ? `${n} équipements` : 'l’équipement'} ${who}`,
+    en: (who: string, n: number) => `Already used by ${n > 1 ? `${n} Equipment items` : 'Equipment item'} ${who}`,
+  },
   repereHint: { fr: 'Nomme les blocs TIA', en: 'Names the TIA blocks' },
   aktid: { fr: 'Repère Aktid', en: 'Aktid tag' },
   descriptif: { fr: 'Descriptif', en: 'Description' },
@@ -132,6 +136,8 @@ const FLOWS: { f: Flow; label: Entry; arrow: string }[] = [
   { f: 'N', label: L.up, arrow: '↑' },
 ];
 
+const DUP_INPUT = { borderColor: 'var(--pid-warn)', boxShadow: '0 0 0 1px var(--pid-warn) inset' };
+
 const selectStyle = { ...inputStyle, appearance: 'auto' as const, padding: '0 4px' };
 
 function Row({ children, muted }: { children: ReactNode; muted?: boolean }) {
@@ -149,6 +155,13 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
   const issues = incompleteReasons(cat, pivot, eq);
   const blocked = reverseBlocked(eq);
   const isCab = isNoAction(cat, eq);
+  // Doublons de repère (client ou Aktid) : signalés dès la saisie, sous le champ.
+  const dupHint = (kind: 'client' | 'aktid', value: string) => {
+    const users = repereUsers(pivot, eq.id, kind, value);
+    if (!users.length) return undefined;
+    const who = users.map((u) => `${u.repere || '?'}${u.descriptif ? ` (${u.descriptif})` : ''}`).join(', ');
+    return <span style={{ color: 'var(--pid-warn)' }}>{tx(L.dupUsed, who, users.length)}</span>;
+  };
   const unit = d0.setpoints?.[0]?.unit;
   const eqName = (id: string) => findEq(pivot, id)?.repere ?? '?';
 
@@ -195,11 +208,11 @@ export function EqDrawer({ cat, pivot, eqId, commit, fault, onClose, onSelect, o
         )}
 
         <SectionHead title={tx(L.identity)} />
-        <Field label={tx(L.repere)} hint={tx(L.repereHint)}>
-          <input aria-label={tx(L.repere)} value={eq.repere} onChange={(e) => set({ repere: e.target.value.trim() })} style={{ ...inputStyle, fontFamily: 'var(--font-tag)' }} />
+        <Field label={tx(L.repere)} hint={dupHint('client', eq.repere) ?? tx(L.repereHint)}>
+          <input aria-label={tx(L.repere)} aria-invalid={!!dupHint('client', eq.repere)} value={eq.repere} onChange={(e) => set({ repere: e.target.value.trim() })} style={{ ...inputStyle, fontFamily: 'var(--font-tag)', ...(dupHint('client', eq.repere) ? DUP_INPUT : {}) }} />
         </Field>
-        <Field label={tx(L.aktid)}>
-          <input aria-label={tx(L.aktid)} value={eq.repereAktid} onChange={(e) => set({ repereAktid: e.target.value })} style={inputStyle} />
+        <Field label={tx(L.aktid)} hint={dupHint('aktid', eq.repereAktid)}>
+          <input aria-label={tx(L.aktid)} aria-invalid={!!dupHint('aktid', eq.repereAktid)} value={eq.repereAktid} onChange={(e) => set({ repereAktid: e.target.value })} style={{ ...inputStyle, ...(dupHint('aktid', eq.repereAktid) ? DUP_INPUT : {}) }} />
         </Field>
         <Field label={tx(L.descriptif)}>
           <input aria-label={tx(L.descriptif)} value={eq.descriptif} onChange={(e) => set({ descriptif: e.target.value })} style={inputStyle} />

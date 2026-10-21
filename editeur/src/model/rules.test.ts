@@ -6,8 +6,8 @@ import { align, distribute } from './align';
 import { principals, type Catalogue } from './catalogue';
 import { SYMBOLS } from './symbols';
 import { straighten } from './straighten';
-import { boxAt } from './geometry';
-import { addChannel, addEq, addOutput, addOutputWithNext, connect, emptyPivot, findEq, removeChannel, setChainType } from './ops';
+import { boxAt, eqBox } from './geometry';
+import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, setChainType } from './ops';
 import { routeAll } from './route';
 import {
   canAddOutput, defaultStack, hgName, hsName, incompleteReasons, isFirstChannel, MAX, nextOutputNum, reverseBlocked, suggestRepere,
@@ -78,6 +78,18 @@ describe('canaux et sorties', () => {
     expect(isFirstChannel(r.p, a.id, 1)).toBe(true);
     expect(isFirstChannel(r.p, r.id!, 1)).toBe(false);
     expect(findEq(r.p, r.id!)!.repere).toBe('08Ab');
+  });
+  it('aucune sortie ni aucun lien depuis un canal qui n’existe plus', () => {
+    const a = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { repere: '08Aa' });
+    const two = addChannel(a.p, a.id);
+    // Menu du « + » ouvert sur le canal 2, puis canal retiré (Ctrl+Z ou « − ») avant le choix.
+    const back = removeChannel(two, a.id, 2);
+    expect(canAddOutput(findEq(back, a.id)!, 2, 'avant')).toBe(false);
+    const r = addOutputWithNext(cat, back, a.id, 2, 'avant', 'BELT');
+    expect(r.id).toBeNull();
+    expect(r.p).toBe(back);
+    const b = addEq(cat, back, 'BELT', 300, 100);
+    expect(connect(b.p, { eq: a.id, ch: 2, dir: 'avant', num: 1 }, { eq: b.id, ch: 1 })).toBe(b.p);
   });
   it('retirer un canal renumérote les liens des canaux suivants', () => {
     let { p, id } = addEq(cat, emptyPivot(cat), 'OPSO', 300, 300, { channels: 3 });
@@ -207,5 +219,39 @@ describe('redresser après un glisser', () => {
     expect(findEq(q, a.id)!.y).toBe(a.y);
     const others = q.equipments.filter((e) => e.id !== a.id);
     expect(others.every((e) => e.y === p0.equipments.find((o) => o.id === e.id)!.y)).toBe(true);
+  });
+});
+
+describe('repères en double et formes orientées', () => {
+  it('signale un repère Aktid en double et ignore la casse du repère client', () => {
+    let p = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { repere: '08Aa' }).p;
+    p = { ...p, equipments: p.equipments.map((e) => ({ ...e, repereAktid: 'TAP-01' })) };
+    const b = addEq(cat, p, 'BELT', 300, 100, { repere: '08AA' });
+    p = { ...b.p, equipments: b.p.equipments.map((e) => (e.id === b.id ? { ...e, repereAktid: ' tap-01 ' } : e)) };
+    const r = incompleteReasons(cat, p, findEq(p, b.id)!);
+    expect(r).toContain('Repère client en double : 08AA');
+    expect(r).toContain('Repère Aktid en double : tap-01');
+  });
+  it('propose un repère libre sans tenir compte de la casse', () => {
+    const p = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { repere: '08AA' }).p;
+    expect(suggestRepere(cat, p, 'BELT', 'A')).toBe('08Ab');
+    const b = addEq(cat, p, 'BELT', 300, 100, { zone: 'A' });
+    expect(incompleteReasons(cat, b.p, findEq(b.p, b.id)!)).toEqual([]);
+  });
+  it('dupliquer ne recopie pas le repère Aktid', () => {
+    let p = addEq(cat, emptyPivot(cat), 'BELT', 100, 100, { repere: '08Aa' }).p;
+    p = { ...p, equipments: p.equipments.map((e) => ({ ...e, repereAktid: 'TAP-01' })) };
+    const r = duplicate(cat, p, [p.equipments[0].id]);
+    expect(findEq(r.p, r.ids[0])!.repereAktid).toBe('');
+    expect(r.p.equipments.filter((e) => incompleteReasons(cat, r.p, e).length)).toEqual([]);
+  });
+  it('un tapis qui descend est vertical, et reste allongé avec deux canaux', () => {
+    const h = eqBox(createEq(cat, emptyPivot(cat), 'BELT', 0, 0, { flow: 'S' }));
+    expect(h.h).toBeGreaterThan(h.w);
+    const two = createEq(cat, emptyPivot(cat), 'BELT', 0, 0, { flow: 'S', channels: 2 });
+    const b2 = eqBox(two);
+    expect(b2.h).toBeGreaterThan(b2.w);
+    const flat = eqBox(createEq(cat, emptyPivot(cat), 'BELT', 0, 0, { flow: 'E', channels: 2 }));
+    expect(flat.w).toBeGreaterThan(flat.h);
   });
 });

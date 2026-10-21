@@ -1,5 +1,5 @@
 // Bibliothèque : HG principaux de la liste HG (ce sont eux qui, posés en HG0, donnent la forme de l'EQ).
-// Glisser = poser ; clic = HG0 utilisé par les gestes « + » (mémoire du dernier choix).
+// Glisser = poser ; clic = HG0 proposé dans le menu des « + », après le convoyeur (mémoire du dernier choix).
 import { useState } from 'react';
 import { Shape, ChuteShape } from '../canvas/symbols';
 import { Abbr, getLang, hgLabel, tx } from '../i18n';
@@ -18,8 +18,8 @@ const L = {
   status: { fr: 'État logiciel :', en: 'Software status:' },
   wincc: { fr: 'ID WinCC :', en: 'WinCC ID:' },
   rowHelp: {
-    fr: 'Glisser sur le PID pour poser · clic : à poser avec les « + » · double-clic : poser au centre',
-    en: 'Drag onto the P&ID to place · click: place it with “+” · double-click: place at centre',
+    fr: 'Glisser sur le PID pour poser · clic : proposer dans le menu des « + » · double-clic : poser au centre',
+    en: 'Drag onto the P&ID to place · click: offer it in the “+” menu · double-click: place at centre',
   },
   drawing: { fr: 'Dessin', en: 'Drawing' },
   chute: { fr: 'Goulotte de tri', en: 'Sorting chute' },
@@ -29,7 +29,7 @@ const L = {
     en: 'Sorting chute — drawing object (status in the pivot file to be confirmed)',
   },
   plusOn: { fr: 'sur un équipement', en: 'on an Equipment item' },
-  plusPlaces: { fr: 'pose :', en: 'places:' },
+  plusPlaces: { fr: 'propose :', en: 'offers:' },
 };
 
 export function Glyph({ hg0, width = 72, height = 44 }: { hg0: string; width?: number; height?: number }) {
@@ -50,6 +50,7 @@ export function Palette({ cat, current, onCurrent, onPlace, onSymbols }: { cat: 
   const codes = principals(cat).filter((k) => !q || norm(k + ' ' + cat.hgTypes[k].label + ' ' + cat.hgTypes[k].labelEn).includes(norm(q)));
   const groups = GROUP_ORDER.filter((g) => codes.some((k) => symbolOf(k).group === g));
   const cur = cat.hgTypes[current];
+  const belt = cat.hgTypes.BELT;
   return (
     <aside style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid var(--surface-panel-header)', background: 'var(--surface-page)' }}>
       <PanelHead icon="layers" title={tx(L.title)} right={<button type="button" title={tx(L.sheet)} aria-label={tx(L.sheet)} onClick={onSymbols} className="abi-btn" style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex' }}><Icon name="grid" size={20} /></button>} />
@@ -127,8 +128,14 @@ export function Palette({ cat, current, onCurrent, onPlace, onSymbols }: { cat: 
       <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border-divider)', font: '400 12px/1.4 var(--font-sans)', color: 'var(--text-muted)' }}>
         <span style={{ color: 'var(--abi-green)' }}>+</span> {tx(L.plusOn)}
         <Abbr>EQ</Abbr> {tx(L.plusPlaces)}{' '}
-        {/* Libellé puis code HG en petit, comme la notification de la planche. */}
+        {/* Menu du « + » : le convoyeur en tête, puis le dernier choix ; libellé puis code HG en petit. */}
         <strong style={{ color: '#fff', fontWeight: 400 }}>
+          {belt && current !== 'BELT' && (
+            <>
+              {hgLabel(belt)}
+              <Abbr>BELT</Abbr>,{' '}
+            </>
+          )}
           {cur ? hgLabel(cur) : ''}
           <Abbr>{current}</Abbr>
         </strong>

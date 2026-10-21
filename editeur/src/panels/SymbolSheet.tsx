@@ -9,6 +9,13 @@ import { Button, PanelHead } from '../ui/ui';
 
 const L = {
   sheet: { fr: 'Planche des symboles', en: 'Symbol chart' },
+  // Titre découpé autour du terme technique, placé juste après « équipement ».
+  pickTitle: { fr: 'Choisir l’équipement', en: 'Choose the Equipment item' },
+  pickTitleEnd: { fr: 'à ajouter', en: 'to add' },
+  pickIntro: {
+    fr: 'Clic sur une carte : l’équipement est posé et relié à la sortie. Le type est donné par son matériel générique principal',
+    en: 'Click a card: the Equipment item is placed and linked to the output. Its type comes from its main Hardware Generic',
+  },
   title: {
     fr: (n: number) => `Planche des symboles — ${n} matériels génériques principaux`,
     en: (n: number) => `Symbol chart — ${n} main Hardware Generic`,
@@ -27,7 +34,10 @@ const L = {
     fr: ', puis à reporter dans la colonne « P&D - Symbole » (vide aujourd\'hui).',
     en: ', then to be entered in the “P&D - Symbole” column (empty today).',
   },
-  pick: { fr: 'Clic sur une carte : ce matériel sera posé par les « + » des équipements.', en: 'Click a card: the “+” handles of Equipment items will place this hardware.' },
+  pick: {
+    fr: 'Clic sur une carte : ce matériel sera proposé dans le menu des « + » des équipements, après le convoyeur.',
+    en: 'Click a card: this hardware will be offered in the “+” menu of Equipment items, after the conveyor.',
+  },
   wincc: { fr: 'ID WinCC', en: 'WinCC ID' },
   noEtat: { fr: 'état —', en: 'status —' },
 };
@@ -60,20 +70,27 @@ function Big({ hg0 }: { hg0: string }) {
   );
 }
 
-export function SymbolSheet({ cat, onClose, onPick }: { cat: Catalogue; onClose: () => void; onPick: (code: string) => void }) {
+export function SymbolSheet({ cat, mode = 'browse', onClose, onPick }: { cat: Catalogue; mode?: 'browse' | 'pick'; onClose: () => void; onPick: (code: string) => void }) {
   const codes = principals(cat);
   const groups = GROUP_ORDER.filter((g) => codes.some((k) => symbolOf(k).group === g));
   return (
     <div role="dialog" aria-modal="true" aria-label={tx(L.sheet)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }} onPointerDown={onClose}>
       <div style={{ width: 'min(1500px, 94vw)', height: '88vh', display: 'flex', flexDirection: 'column', background: 'var(--surface-page)', border: '1px solid var(--surface-panel-header)' }} onPointerDown={(e) => e.stopPropagation()}>
-        <PanelHead icon="grid" title={<>{tx(L.title, codes.length)}<Abbr>HG</Abbr></>} right={<Button variant="ghost" icon="x" title={tx(L.close)} onClick={onClose} />} />
-        <p style={{ margin: 0, padding: '10px 12px', font: '400 13px/1.45 var(--font-sans)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-divider)' }}>
-          {tx(L.each)}
-          <Abbr>HG</Abbr> {tx(L.source, cat.sources.hg.fichier, cat.sources.hg.date)}
-          <Abbr>EQ</Abbr> {tx(L.sourceEnd)}{' '}
-          {tx(L.shapes)} <strong style={{ color: 'var(--abi-orange-text)', fontWeight: 400 }}>{tx(L.toValidate)}</strong>
-          {tx(L.report)} {tx(L.pick)}
-        </p>
+        <PanelHead icon="grid" title={mode === 'pick' ? <>{tx(L.pickTitle)}<Abbr>EQ</Abbr> {tx(L.pickTitleEnd)}</> : <>{tx(L.title, codes.length)}<Abbr>HG</Abbr></>} right={<Button variant="ghost" icon="x" title={tx(L.close)} onClick={onClose} />} />
+        {mode === 'pick' ? (
+          <p style={{ margin: 0, padding: '10px 12px', font: '400 13px/1.45 var(--font-sans)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-divider)' }}>
+            {tx(L.pickIntro)}
+            <Abbr>HG</Abbr>.
+          </p>
+        ) : (
+          <p style={{ margin: 0, padding: '10px 12px', font: '400 13px/1.45 var(--font-sans)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-divider)' }}>
+            {tx(L.each)}
+            <Abbr>HG</Abbr> {tx(L.source, cat.sources.hg.fichier, cat.sources.hg.date)}
+            <Abbr>EQ</Abbr> {tx(L.sourceEnd)}{' '}
+            {tx(L.shapes)} <strong style={{ color: 'var(--abi-orange-text)', fontWeight: 400 }}>{tx(L.toValidate)}</strong>
+            {tx(L.report)} {tx(L.pick)}
+          </p>
+        )}
         <div style={{ overflow: 'auto', flex: 1, padding: '4px 12px 16px' }}>
           {groups.map((g) => (
             <section key={g}>

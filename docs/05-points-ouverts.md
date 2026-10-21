@@ -23,3 +23,6 @@
 | Vocabulaire opérateur à valider | « Matériel principal » pour HG0 ; « début de flux » pour first channel ; « sans action » pour no action ; « Sortie non reliée » ; « Automate (CPU) » ; « pivot » encore visible (« Enregistrer le pivot ») ; « À coder » accentué alors que la liste dit « A coder » | | |
 | Vocabulaire anglais à valider | P&ID (et non PID) ; Customer tag ; Equipment item(s) ; Main Hardware Generic ; Unconnected output ; Start of flow ; Sorting chute ; Draft (esquisse) ; placeholder (fictif) | | |
 | Libellés anglais du catalogue | Les HS, noms de consignes et options du bloc EQ n'ont pas de champ anglais dans les sources ; l'éditeur garde une petite table anglaise provisoire pour les 4 options | | |
+| Onglet des canaux « − n canaux + » | Au survol : au-dessus de l'équipement en flux horizontal ; à droite en flux vertical (le haut et le bas portent alors les sorties et les arrivées) | | |
+| Menu du « + » d'une sortie | Convoyeur en tête par défaut, puis le dernier choix, puis « Autre équipement… » (planche complète) | | |
+| Doublons de repère | Repère client et repère Aktid contrôlés sans tenir compte des majuscules ni des espaces (08aa = 08Aa) ; « Dupliquer » vide le repère Aktid de la copie | | |
