@@ -117,16 +117,52 @@ export function addOutputWithNext(cat: Catalogue, p: Pivot, eqId: string, ch: nu
   return { p: connect(made.p, r.ref, { eq: made.id, ch: 1 }), id: made.id };
 }
 
+/** Supprimer un trait supprime aussi sa sortie ; les sorties suivantes du canal remontent (1.2 → 1.1). */
 export function removeLink(p: Pivot, linkId: string): Pivot {
-  return touch({ ...p, links: p.links.filter((l) => l.id !== linkId) });
+  const l = p.links.find((x) => x.id === linkId);
+  if (!l) return p;
+  return removeOutput(p, l.from);
 }
 
+/**
+ * Numéros des sorties d'un canal (dans un sens) réattribués 1, 2, 3… dans l'ordre donné ; les liens
+ * suivent leur sortie. `order` = anciens numéros, dans le nouvel ordre.
+ */
+function renumber(p: Pivot, eqId: string, ch: number, dir: Dir, order: number[]): Pivot {
+  const map = new Map(order.map((old, i) => [old, i + 1]));
+  const next = mapEq(p, eqId, (e) => ({
+    ...e,
+    channels: e.channels.map((c, i) =>
+      i === ch - 1 ? { outputs: c.outputs.map((o) => (o.dir === dir && map.has(o.num) ? { ...o, num: map.get(o.num)! } : o)) } : c,
+    ),
+  }));
+  return {
+    ...next,
+    links: next.links.map((l) =>
+      l.from.eq === eqId && l.from.ch === ch && l.from.dir === dir && map.has(l.from.num) ? { ...l, from: { ...l.from, num: map.get(l.from.num)! } } : l,
+    ),
+  };
+}
+
+const numsOf = (p: Pivot, eqId: string, ch: number, dir: Dir) =>
+  (findEq(p, eqId)?.channels[ch - 1]?.outputs ?? []).filter((o) => o.dir === dir).map((o) => o.num).sort((a, b) => a - b);
+
+/** Supprime une sortie (et son lien) ; les sorties suivantes du canal remontent d'un numéro. */
 export function removeOutput(p: Pivot, ref: OutputRef): Pivot {
   const next = mapEq(p, ref.eq, (e) => ({
     ...e,
     channels: e.channels.map((c, i) => (i === ref.ch - 1 ? { outputs: c.outputs.filter((o) => !(o.dir === ref.dir && o.num === ref.num)) } : c)),
   }));
-  return touch({ ...next, links: next.links.filter((l) => !sameOutput(l.from, ref)) });
+  const cleaned = { ...next, links: next.links.filter((l) => !sameOutput(l.from, ref)) };
+  return touch(renumber(cleaned, ref.eq, ref.ch, ref.dir, numsOf(cleaned, ref.eq, ref.ch, ref.dir)));
+}
+
+/** Donne à une sortie le numéro voulu (ex. la mettre en sortie 1) ; les autres se décalent. */
+export function setOutputNum(p: Pivot, ref: OutputRef, num: number): Pivot {
+  const order = numsOf(p, ref.eq, ref.ch, ref.dir).filter((n) => n !== ref.num);
+  if (order.length + 1 < num || num < 1) return p;
+  order.splice(num - 1, 0, ref.num);
+  return touch(renumber(p, ref.eq, ref.ch, ref.dir, order));
 }
 
 export function addChannel(p: Pivot, eqId: string): Pivot {

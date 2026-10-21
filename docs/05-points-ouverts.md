@@ -15,7 +15,8 @@
 | Symbole de chacun des 48 HG principaux | Planche proposée dans l'éditeur (bouton grille de la bibliothèque) : forme du synoptique SCADA 2026 + pictogramme ; à reporter dans la colonne « P&D - Symbole », vide aujourd'hui | | |
 | Couleur des liens selon le type de sortie | Retirée pour le moment (21/10) : trait neutre, étiquette « canal.sortie » (1.2 = canal 1, sortie 2) sur chaque trait | Couleurs retirées | 21/10/2026 |
 | Marche arrière vs matière qui boucle | Marche arrière = donnée (sortie côté arrière) : pointillé + « AR ». Boucle (recirculation) = lien avant qui revient en amont : trait plein, repéré automatiquement par « ↺ » sur son étiquette (lien qui ferme la boucle) | Décidé | 21/10/2026 |
-| Plusieurs sorties sur un même canal | Même point de départ (axe du canal), puis séparation en peigne ; chaque branche porte son étiquette après son premier coude | | |
+| Plusieurs sorties sur un même canal | Un point de départ par sortie : S1 sur l'axe du canal, les autres décalées de part et d'autre (selon la position de leur cible) ; étiquette « canal.sortie » collée au départ. Numéro réglable sur le trait sélectionné (les autres se décalent) ; supprimer un trait supprime sa sortie et renumérote | Décidé | 21/10/2026 |
+| Flèche vers un canal entrée par le dessus / dessous | La flèche traverse l'équipement jusqu'à l'axe du canal visé | Décidé | 21/10/2026 |
 | Commande par défaut au-dessus du moteur | La liste HG donne KM en « Superieur 1 (défaut) » sous MRAS ; un réglage de base du projet peut imposer DRIV, SOFT ou KMIN | | |
 | Préfixe du repère client proposé | Proposition : préfixe par HG0 (08 BELT, 13 OPSO, 63 TROM…) + zone du dernier EQ + lettre libre (08Aa, 08Ab…) | | |
 | Goulotte de tri | Simple objet de dessin, ou EQ du pivot ? | | |

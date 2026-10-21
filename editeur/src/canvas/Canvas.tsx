@@ -6,11 +6,11 @@ import { boxAt, CH_PITCH, channelOffset, CHUTE_SIZE, eqBox, hg0Of, isHorizontal,
 import { axisCandidates } from '../model/straighten';
 import { guideSnap } from '../model/align';
 import {
-  addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
+  addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, removeLink, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
   setLinkTarget,
 } from '../model/ops';
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
-import { handlePositions, loopLinks, outputColor, outputTag, routeAll, tagAnchor, type Pt } from '../model/route';
+import { handlePositions, loopLinks, outputColor, outputTag, placeTags, routeAll, tagAnchor, type Pt } from '../model/route';
 import {
   canAddChannel, canAddOutput, hgDef, isNoAction, MAX, nextOutputNum, outputsOf, pad2, polarity, reverseBlocked,
   zoneOf,
@@ -171,6 +171,9 @@ const L = {
   menuTitle: { fr: (r: string) => `Ajouter après ${r}`, en: (r: string) => `Add after ${r}` },
   menuDefault: { fr: 'par défaut', en: 'default' },
   menuLast: { fr: 'dernier choix', en: 'last choice' },
+  numBar: { fr: (ch: number) => `Numéro de sortie (canal ${ch})`, en: (ch: number) => `Output number (channel ${ch})` },
+  numHint: { fr: 'Les autres sorties du canal se décalent', en: 'The other outputs of the channel shift' },
+  delLink: { fr: 'Supprimer le trait et sa sortie (Suppr)', en: 'Delete the link and its output (Del)' },
   menuOther: { fr: 'Autre équipement…', en: 'Other Equipment item…' },
   menuOtherSub: { fr: 'ouvrir la liste complète', en: 'open the full list' },
   undo: { fr: ' · Ctrl+Z pour annuler', en: ' · Ctrl+Z to undo' },
@@ -217,6 +220,10 @@ export function Canvas(props: Props) {
   const lang = getLang();
   const routed = useMemo(() => routeAll(pivot), [pivot, lang]);
   const loops = useMemo(() => loopLinks(pivot), [pivot.links, pivot.equipments]);
+  const tags = useMemo(
+    () => placeTags(pivot, routed.links, (l) => outputTag(l.link.from.ch, l.link.from.num, l.link.from.dir) + (loops.has(l.id) ? ' ↺' : '')),
+    [pivot, routed, loops],
+  );
   const selEqs = useMemo(() => new Set(sel.eqs), [sel.eqs]);
 
   // Taille du conteneur (pour « ajuster »).
@@ -691,9 +698,10 @@ export function Canvas(props: Props) {
                     e.stopPropagation();
                     if (e.button === 1 || space.current) return startPan(e);
                     props.setSel({ ...EMPTY_SEL, link: l.id });
+                    setTip(null);
                   }}
-                  onPointerEnter={(e) => { setHoverLink(l.id); pointerTip(e, linkTip(l.link)); }}
-                  onPointerMove={(e) => hoverLink === l.id && pointerTip(e, linkTip(l.link))}
+                  onPointerEnter={(e) => { setHoverLink(l.id); if (sel.link !== l.id) pointerTip(e, linkTip(l.link)); }}
+                  onPointerMove={(e) => hoverLink === l.id && sel.link !== l.id && pointerTip(e, linkTip(l.link))}
                   onPointerLeave={() => { setHoverLink(null); setTip(null); }}
                   style={{ cursor: 'pointer' }}
                 >
@@ -703,12 +711,13 @@ export function Canvas(props: Props) {
                     stroke={on ? 'var(--pid-select)' : outputColor(l.num)}
                     strokeWidth={on || hot ? 2.6 : l.dashed ? 1.6 : 2}
                     strokeDasharray={l.dashed ? '5 5' : undefined}
-                    markerEnd={`url(#${on ? 'arw-sel' : 'arw-' + Math.min(l.num, 6)})`}
+                    markerEnd={l.inner ? undefined : `url(#${on ? 'arw-sel' : 'arw-' + Math.min(l.num, 6)})`}
                   />
                   {(() => {
-                    const ta = tagAnchor(l.points);
+                    const ta = tags.get(l.id) ?? tagAnchor(l.points);
                     return (
-                      <text x={ta.x} y={ta.y} textAnchor={ta.anchor} dominantBaseline="central" style={{ ...TAG_STYLE, fill: on ? 'var(--pid-select)' : TAG_STYLE.fill }}>
+                      // Étiquette cliquable : sélectionne le trait (comme un clic sur le trait).
+                      <text x={ta.x} y={ta.y} textAnchor={ta.anchor} dominantBaseline="central" style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'pointer', fill: on ? 'var(--pid-select)' : TAG_STYLE.fill }}>
                         {outputTag(l.link.from.ch, l.link.from.num, l.link.from.dir)}{loops.has(l.id) ? ' ↺' : ''}
                       </text>
                     );
@@ -732,8 +741,8 @@ export function Canvas(props: Props) {
                 >
                   <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="transparent" strokeWidth={10} />
                   <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={on ? 'var(--pid-select)' : outputColor(s.num)} strokeWidth={2} strokeDasharray={s.dashed ? '4 3' : undefined} />
-                  <circle cx={b[0]} cy={b[1]} r={3.5} fill="var(--pid-bg)" stroke={on ? 'var(--pid-select)' : outputColor(s.num)} strokeWidth={1.5} />
-                  <text x={b[0] + (b[0] - a[0]) * 0.4 + (a[0] === b[0] ? 6 : 0)} y={b[1] + (b[1] - a[1]) * 0.4 - (a[1] === b[1] ? 7 : 0)} textAnchor={a[0] === b[0] ? 'start' : 'middle'} dominantBaseline="central" style={TAG_STYLE}>
+                  {/* Sortie libre : petit trait sans cercle, étiquette dans le prolongement du trait. */}
+                  <text x={b[0] + (b[0] - a[0]) * 0.5 + (b[0] === a[0] ? 0 : Math.sign(b[0] - a[0]) * 4)} y={b[1] + (b[1] - a[1]) * 0.5} textAnchor={b[0] === a[0] ? 'middle' : b[0] > a[0] ? 'start' : 'end'} dominantBaseline="central" style={{ ...TAG_STYLE, pointerEvents: 'auto', cursor: 'crosshair' }}>
                     {outputTag(s.ref.ch, s.ref.num, s.ref.dir)}
                   </text>
                 </g>
@@ -752,6 +761,27 @@ export function Canvas(props: Props) {
               onHover={setHoverDelayed}
             />
           ))}
+
+          {/* Fins de flèche qui traversent un équipement jusqu'à l'axe du canal visé : par-dessus les formes. */}
+          <g pointerEvents="none" fill="none" strokeLinecap="round">
+            {routed.links.filter((l) => l.inner && !(wire && wire.mode === 'retarget' && wire.linkId === l.id)).map((l) => {
+              const on = sel.link === l.id;
+              const [a, b] = l.inner!;
+              return (
+                <line
+                  key={l.id}
+                  x1={a[0]}
+                  y1={a[1]}
+                  x2={b[0]}
+                  y2={b[1]}
+                  stroke={on ? 'var(--pid-select)' : outputColor(l.num)}
+                  strokeWidth={on || hoverLink === l.id ? 2.6 : l.dashed ? 1.6 : 2}
+                  strokeDasharray={l.dashed ? '5 5' : undefined}
+                  markerEnd={`url(#${on ? 'arw-sel' : 'arw-' + Math.min(l.num, 6)})`}
+                />
+              );
+            })}
+          </g>
 
           {wire && (
             <g pointerEvents="none">
@@ -798,6 +828,7 @@ export function Canvas(props: Props) {
               onTipEnd={() => setTip(null)}
               onWire={startWire}
               incomingLast={pivot.links.filter((l) => l.to.eq === handleTarget.id && l.to.ch === handleTarget.channels.length).length}
+              others={[...boxes.entries()].filter(([id]) => id !== handleTarget.id).map(([, b]) => b)}
               onAddChannel={() => props.commit(addChannel(pivot, handleTarget.id))}
               onRemoveChannel={() => props.commit(removeChannel(pivot, handleTarget.id, handleTarget.channels.length))}
               onBodyDown={(e) => onEqDown(e, handleTarget.id)}
@@ -848,6 +879,48 @@ export function Canvas(props: Props) {
         </div>
       )}
 
+      {selLink && !wire && !menu && (() => {
+        const ref = selLink.link.from;
+        const src = findEq(pivot, ref.eq);
+        if (!src) return null;
+        const count = (src.channels[ref.ch - 1]?.outputs ?? []).filter((o) => o.dir === ref.dir).length;
+        const tp = tags.get(selLink.id) ?? tagAnchor(selLink.points);
+        const [hx, hy] = toHost([tp.x, tp.y]);
+        const btn: React.CSSProperties = { minWidth: 24, height: 24, border: '1px solid var(--border-nav)', borderRadius: 3, cursor: 'pointer', font: '600 12px var(--font-tag)' };
+        return (
+          <div
+            role="toolbar"
+            aria-label={tx(L.numBar, ref.ch)}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{ position: 'absolute', left: hx - 10, top: hy + 12, display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', background: 'var(--surface-page)', border: '1px solid var(--abi-green)', zIndex: 5, boxShadow: 'var(--shadow-drawer)' }}
+          >
+            <span title={tx(L.numHint)} style={{ font: '400 12px var(--font-sans)', color: 'var(--text-secondary)', marginRight: 2 }}>{tx(L.numBar, ref.ch)}</span>
+            {Array.from({ length: count }, (_, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
+                aria-pressed={n === ref.num}
+                title={tx(L.numHint)}
+                className="abi-btn"
+                onClick={() => n !== ref.num && props.commit(setOutputNum(pivot, ref, n))}
+                style={{ ...btn, background: n === ref.num ? 'var(--abi-green)' : 'var(--surface-nav)', color: '#fff' }}
+              >
+                {ref.ch}.{n}
+              </button>
+            ))}
+            <button
+              type="button"
+              title={tx(L.delLink)}
+              aria-label={tx(L.delLink)}
+              className="abi-btn"
+              onClick={() => { props.commit(removeLink(pivot, selLink.id)); props.setSel(EMPTY_SEL); }}
+              style={{ ...btn, marginLeft: 4, background: 'var(--abi-tint-red)', color: '#ffd7d3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon name="trash" size={14} />
+            </button>
+          </div>
+        );
+      })()}
       {menu && (() => {
         const src = findEq(pivot, menu.src.eq);
         if (!src) return null;
@@ -943,6 +1016,8 @@ function Handles(props: {
   onTipEnd: () => void;
   onWire: (e: React.PointerEvent, src: { eq: string; ch: number; dir: Dir }, origin: Pt) => void;
   incomingLast: number;
+  /** Boîtes des autres équipements : l'onglet des canaux se pose là où il ne les recouvre pas. */
+  others: Box[];
   onAddChannel: () => void;
   onRemoveChannel: () => void;
   /** Appui sur le corps de l'onglet : comme sur l'équipement (sélection, déplacement). */
@@ -998,8 +1073,20 @@ function Handles(props: {
   const TW = TAB.w;
   const TH = TAB.h;
   const hor = isHorizontal(eq.flow);
-  const tx0 = hor ? box.cx - TW / 2 : box.x1 + TAB.gap;
-  const ty0 = hor ? box.y0 - TAB.gap - TH : box.cy - TH / 2;
+  // Emplacements essayés dans l'ordre : au-dessus / dessous (flux horizontal), à droite / à gauche
+  // (flux vertical), puis les deux autres ; le premier qui ne recouvre aucun équipement voisin.
+  // Sur les côtés qui portent les « + » de sortie, l'onglet se pose au-delà d'eux.
+  const vGap = hor ? TAB.gap : 34;
+  const hGap = hor ? 34 : TAB.gap;
+  const spots: [number, number][] = [
+    [box.cx - TW / 2, box.y0 - vGap - TH],
+    [box.cx - TW / 2, box.y1 + vGap],
+    [box.x1 + hGap, box.cy - TH / 2],
+    [box.x0 - hGap - TW, box.cy - TH / 2],
+  ];
+  const order = hor ? [0, 1, 2, 3] : [2, 3, 0, 1];
+  const fits = ([x, y]: [number, number]) => !props.others.some((o) => x < o.x1 + 2 && x + TW > o.x0 - 2 && y < o.y1 + 2 && y + TH > o.y0 - 2);
+  const [tx0, ty0] = order.map((i) => spots[i]).find(fits) ?? spots[order[0]];
   const lastOutputs = eq.channels[n - 1]?.outputs.length ?? 0;
   const loss = [lastOutputs ? tx(L.outputsLost, lastOutputs) : '', props.incomingLast ? tx(L.linksLost, props.incomingLast) : ''].filter(Boolean).join(' · ');
   const btn = (kind: 'minus' | 'plus') => {

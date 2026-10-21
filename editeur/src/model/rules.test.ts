@@ -7,7 +7,8 @@ import { principals, type Catalogue } from './catalogue';
 import { SYMBOLS } from './symbols';
 import { straighten } from './straighten';
 import { boxAt, eqBox } from './geometry';
-import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, setChainType } from './ops';
+import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum } from './ops';
+import type { Pivot } from './pivot';
 import { loopLinks, routeAll } from './route';
 import {
   canAddOutput, defaultStack, hgName, hsName, incompleteReasons, isFirstChannel, MAX, nextOutputNum, reverseBlocked, suggestRepere,
@@ -262,5 +263,32 @@ describe('boucles', () => {
     const rep = (id: string) => p.equipments.find((e) => e.id === id)!.repere;
     const loops = [...loopLinks(p)].map((id) => p.links.find((l) => l.id === id)!).map((l) => `${rep(l.from.eq)}>${rep(l.to.eq)}`);
     expect(loops).toEqual(['27Pb>08Ae']);
+  });
+});
+
+describe('numéros de sortie', () => {
+  const three = () => {
+    const a = addEq(cat, emptyPivot(cat), 'BS', 100, 100, { repere: 'AAa' });
+    let p = a.p;
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const t = addEq(cat, p, 'BELT', 300, 100 + i * 80);
+      p = connect(t.p, { eq: a.id, ch: 1, dir: 'avant', num: i + 1 }, { eq: t.id, ch: 1 });
+      ids.push(t.id);
+    }
+    return { p, a: a.id, ids };
+  };
+  const numTo = (p: Pivot, target: string) => p.links.find((l) => l.to.eq === target)!.from.num;
+  it('supprimer le trait de la sortie 1 fait remonter les suivantes', () => {
+    const { p, ids } = three();
+    const q = removeLink(p, p.links.find((l) => l.to.eq === ids[0])!.id);
+    expect([numTo(q, ids[1]), numTo(q, ids[2])]).toEqual([1, 2]);
+    expect(findEq(q, q.links[0].from.eq)!.channels[0].outputs.map((o) => o.num).sort()).toEqual([1, 2]);
+  });
+  it('mettre une sortie en 1 décale les autres', () => {
+    const { p, ids } = three();
+    const ref = p.links.find((l) => l.to.eq === ids[2])!.from;
+    const q = setOutputNum(p, ref, 1);
+    expect(ids.map((id) => numTo(q, id))).toEqual([2, 3, 1]);
   });
 });
