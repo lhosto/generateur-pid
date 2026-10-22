@@ -6,8 +6,8 @@ import { align, distribute } from './align';
 import { principals, type Catalogue } from './catalogue';
 import { SYMBOLS, aktidSymbolOf, setActiveShapes, symbolOf } from './symbols';
 import { straighten } from './straighten';
-import { boxAt, eqBox, sideOffset } from './geometry';
-import { addChannel, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum, takeOutput, updateEq, activeStandard, duplicateStandard, setStandardBase, setActiveStandard, deleteStandard } from './ops';
+import { boxAt, CHUTE_SIZE, eqBox, sideOffset } from './geometry';
+import { addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, createEq, duplicate, emptyPivot, findEq, removeChannel, removeLink, setChainType, setOutputNum, takeOutput, updateEq, activeStandard, duplicateStandard, setStandardBase, setActiveStandard, deleteStandard } from './ops';
 import type { Pivot } from './pivot';
 import { arMark, loopLinks, routeAll, shortTag, tagFor } from './route';
 import {
@@ -737,5 +737,22 @@ describe('sortie obligatoire', () => {
     expect(canRemoveOutput(findEq(two, b.id)!, 1, 'avant')).toBe(true);
     const s = addEq(cat, emptyPivot(cat), 'S', 100, 100);
     expect(canRemoveOutput(findEq(s.p, s.id)!, 1, 'avant')).toBe(true);
+  });
+});
+
+describe('séparation multicanal et goulottes', () => {
+  it('chaque canal d’une machine de séparation naît avec − et + ; un canal ajouté aussi', () => {
+    const o = addEq(cat, emptyPivot(cat), 'OPSO', 100, 100, { channels: 2 });
+    expect(findEq(o.p, o.id)!.channels.map((c) => c.outputs.length)).toEqual([2, 2]);
+    const q = addChannel(o.p, o.id);
+    expect(findEq(q, o.id)!.channels[2].outputs.length).toBe(2);
+  });
+  it('goulotte lâchée près d’une autre : collée bord à bord, alignée', () => {
+    let p = addChute(emptyPivot(cat), 100, 100).p;
+    const b = addChute(p, 118, 103);
+    const [c1, c2] = b.p.chutes;
+    expect(c2.x - c1.x).toBe(CHUTE_SIZE.w);
+    expect(c2.y).toBe(c1.y);
+    void p;
   });
 });

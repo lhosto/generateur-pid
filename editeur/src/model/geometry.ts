@@ -31,7 +31,8 @@ export const CH_PITCH = 20;
 export const CONV_PITCH = 28;
 /** Écart des canaux d'un équipement (convoyeur : CONV_PITCH). */
 export const pitchOf = (eq: Pick<Eq, 'hg'>) => (baseOf(eq) === 'pill' ? CONV_PITCH : CH_PITCH);
-export const CHUTE_SIZE = { w: 22, h: 104 };
+/** Goulotte de tri : petit rectangle, moitié d'un poste opérateur (valoriste) ; elles s'assemblent. */
+export const CHUTE_SIZE = { w: 14, h: 12 };
 
 export interface Box {
   x0: number;
@@ -51,6 +52,12 @@ export const baseOf = (eq: Pick<Eq, 'hg'>): Base => symbolOf(hg0Of(eq)).base;
 
 /** Longueur minimale d'un convoyeur : un repère de 6 caractères tient dedans (arrondie à la grille). */
 const PILL_MIN_LEN = Math.ceil((textWidth('000000') + 12) / GRID) * GRID;
+
+/**
+ * Échelle du marqueur d'une machine de séparation selon son épaisseur (en travers du flux) : il grandit
+ * avec les canaux (un seul marqueur, au centre, qui occupe environ la moitié de l'épaisseur).
+ */
+export const flareMarkerScale = (cross: number) => Math.max(0.88, Math.min(1.8, (cross * 0.5) / 22));
 
 /** Formes allongées : elles s'orientent dans le sens du flux (un tapis qui descend est vertical). */
 const ORIENTED = new Set<Base>(['pill', 'flare', 'card', 'screen', 'grid', 'para']);
@@ -80,7 +87,10 @@ export function eqBox(eq: Eq): Box {
   const { w, h } = sizeOf(baseOf(eq), 1, eq.flow);
   const t = thickness(eq);
   // Séparation à l'horizontale : assez longue pour son repère (côté entrée) et son marqueur (côté sorties).
-  const len = eq.len ?? (baseOf(eq) === 'flare' && isHorizontal(eq.flow) ? Math.max(w, textWidth(eq.repere || '?') + 36) : undefined);
+  // Avec le marqueur, qui grandit avec les canaux.
+  // À la verticale, le repère (horizontal) ne prend que sa hauteur.
+  const room = isHorizontal(eq.flow) ? textWidth(eq.repere || '?') + 18 : FONT.tag + 14;
+  const len = eq.len ?? (baseOf(eq) === 'flare' ? Math.max(isHorizontal(eq.flow) ? w : h, room + 22 * flareMarkerScale(t)) : undefined);
   return isHorizontal(eq.flow) ? boxAt(eq.x, eq.y, len ?? w, t) : boxAt(eq.x, eq.y, t, len ?? h);
 }
 

@@ -6,7 +6,7 @@ import { type Box, boxAt, chAxis, chEdges, CHUTE_SIZE, eqBox, flowVec, FONT, hg0
 import { axisCandidates } from '../model/straighten';
 import { guideSnap } from '../model/align';
 import {
-  addChannel, addChute, addEq, addOutput, addOutputWithNext, connect, removeLink, removeOutput, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
+  addChannel, addChute, addEq, assembleChutes, addOutput, addOutputWithNext, connect, removeLink, removeOutput, setOutputNum, DEFAULT_CHUTE_LABEL, findEq, moveItems, removeChannel, sameOutput,
   placeNext, setLinkTarget, updateEq,
 } from '../model/ops';
 import type { Dir, Eq, OutputRef, Pivot } from '../model/pivot';
@@ -583,6 +583,8 @@ export function Canvas(props: Props) {
         // Overband / poulie lâché près d'un convoyeur : il s'y accole (et le lien se crée).
         let q = pv;
         for (const eqId of d.eqs) q = dockOnDrop(q, eqId);
+        // Goulottes lâchées près d'une autre : assemblées bord à bord.
+        if (d.chutes.length) q = assembleChutes(q, d.chutes);
         commit(q, d.start);
       }
       else if (d.clicked) props.setSel({ ...EMPTY_SEL, eqs: findEq(pv, d.clicked) ? [d.clicked] : [], chutes: findEq(pv, d.clicked) ? [] : [d.clicked] });

@@ -1,6 +1,6 @@
 // Opérations pures sur le pivot : chaque fonction rend un nouveau pivot (annuler/rétablir par copie).
 import type { BaseSettings, Catalogue } from './catalogue';
-import { boxAt, eqBox, flowVec, hg0Of, opposite, overlaps, sideOffset, sizeOf, snap, type Box } from './geometry';
+import { boxAt, CHUTE_SIZE, eqBox, flowVec, hg0Of, opposite, overlaps, sideOffset, sizeOf, snap, type Box } from './geometry';
 import { PIVOT_FORMAT, uid, type Chute, type Dir, type Eq, type Flow, type Link, type OutputRef, type Pivot } from './pivot';
 import {
   defaultOptions, defaultSetpoints, defaultStack, chainOf, hgDef, proximityOf, makeHg,
@@ -53,12 +53,14 @@ export function createEq(cat: Catalogue, p: Pivot, hg0: string, x: number, y: nu
     // Nativement, le canal 1 a sa sortie 1.1 déclarée, en attente de raccordement (sauf armoire « no action ») ;
     // une machine de séparation a d'emblée sa sortie négative (−) et sa sortie positive (+).
     channels: Array.from({ length: Math.min(MAX.channels, o.channels ?? 1) }, (_, i) => ({
-      outputs:
-        i !== 0 || cat.noAction.includes(hg0)
-          ? []
-          : symbolOf(hg0).group === 'Séparation'
-            ? [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }]
-            : [{ dir: 'avant' as const, num: 1 }],
+      // Séparation : − et + sur chaque canal ; ailleurs, la sortie 1 du canal 1.
+      outputs: cat.noAction.includes(hg0)
+        ? []
+        : symbolOf(hg0).group === 'Séparation'
+          ? [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }]
+          : i === 0
+            ? [{ dir: 'avant' as const, num: 1 }]
+            : [],
     })),
   };
 }
@@ -209,8 +211,11 @@ export function setOutputNum(p: Pivot, ref: OutputRef, num: number): Pivot {
 export function addChannel(p: Pivot, eqId: string): Pivot {
   const eq = findEq(p, eqId);
   if (!eq || !canAddChannel(eq)) return p;
-  // Le nouveau canal arrive, comme un nouvel équipement, avec sa sortie 1 en attente de raccordement.
-  return touch(mapEq(p, eqId, (e) => ({ ...e, channels: [...e.channels, { outputs: [{ dir: 'avant' as const, num: 1 }] }] })));
+  // Le nouveau canal arrive, comme un nouvel équipement, avec sa sortie 1 en attente de raccordement ; une
+  // machine de séparation libre, avec sa sortie − et sa sortie + (posée sur un tapis : une seule sortie).
+  const sep = symbolOf(hg0Of(eq)).group === 'Séparation' && !eq.dockedTo;
+  const outputs = sep ? [{ dir: 'avant' as const, num: 1 }, { dir: 'avant' as const, num: 2 }] : [{ dir: 'avant' as const, num: 1 }];
+  return touch(mapEq(p, eqId, (e) => ({ ...e, channels: [...e.channels, { outputs }] })));
 }
 
 /** Retire le canal n : ses sorties et les liens qui y arrivent disparaissent, les canaux suivants remontent. */
@@ -336,7 +341,36 @@ export const DEFAULT_CHUTE_LABEL = 'Goulotte de tri';
 
 export function addChute(p: Pivot, x: number, y: number): { p: Pivot; id: string } {
   const c: Chute = { id: uid('gt'), x: snap(x), y: snap(y), label: DEFAULT_CHUTE_LABEL };
-  return { p: touch({ ...p, chutes: [...p.chutes, c] }), id: c.id };
+  return { p: assembleChutes(touch({ ...p, chutes: [...p.chutes, c] }), [c.id]), id: c.id };
+}
+
+/**
+ * Goulottes assemblées : une goulotte lâchée près d'une autre (écart ≤ 10) se colle à elle, bord à bord,
+ * alignée sur elle (on forme des rangées ou des colonnes de goulottes).
+ */
+export function assembleChutes(p: Pivot, ids: string[]): Pivot {
+  const { w, h } = CHUTE_SIZE;
+  let chutes = p.chutes;
+  for (const id of ids) {
+    const c = chutes.find((x) => x.id === id);
+    if (!c) continue;
+    let best: { x: number; y: number; d: number } | null = null;
+    for (const o of chutes) {
+      if (o.id === id || ids.includes(o.id)) continue;
+      const dx = c.x - o.x;
+      const dy = c.y - o.y;
+      // Côte à côte (gauche / droite) ou l'une sur l'autre (dessus / dessous).
+      const side = Math.abs(dy) < h && Math.abs(Math.abs(dx) - w) <= 10 ? { x: o.x + Math.sign(dx || 1) * w, y: o.y } : null;
+      const stack = Math.abs(dx) < w && Math.abs(Math.abs(dy) - h) <= 10 ? { x: o.x, y: o.y + Math.sign(dy || 1) * h } : null;
+      for (const t of [side, stack]) {
+        if (!t) continue;
+        const d = Math.hypot(t.x - c.x, t.y - c.y);
+        if (!best || d < best.d) best = { ...t, d };
+      }
+    }
+    if (best) chutes = chutes.map((x) => (x.id === id ? { ...x, x: best!.x, y: best!.y } : x));
+  }
+  return chutes === p.chutes ? p : { ...p, chutes };
 }
 
 /** Les réglages de base ne s'appliquent qu'aux nouveaux équipements. */

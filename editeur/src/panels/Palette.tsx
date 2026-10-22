@@ -117,8 +117,9 @@ export function Palette({ cat, current, onCurrent, onPlace, onSymbols }: { cat: 
           style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '0 6px', padding: '1px 6px 1px 0', background: 'var(--surface-nav)', border: '1px solid transparent', cursor: 'grab' }}
         >
           <svg width={72} height={44} viewBox="-36 -22 72 44" aria-hidden="true">
-            <g transform="scale(0.4)">
-              <ChuteShape x={0} y={0} label={tx(L.chuteShort)} />
+            <g transform="scale(1.6)">
+              <ChuteShape x={-5} y={0} label={tx(L.chuteShort)} />
+              <ChuteShape x={9} y={0} label={tx(L.chuteShort)} />
             </g>
           </svg>
           <div style={{ font: '400 13px var(--font-sans)' }}>{tx(L.chute)}</div>

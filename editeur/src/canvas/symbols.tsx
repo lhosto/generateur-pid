@@ -2,7 +2,7 @@
 // (model/symbols.ts, dessins dans markers.ts), en gris, version édition (pas de barre d'état ni de
 // couleur d'animation). Seule une erreur de génération colore la forme (rouge défaut).
 import { memo } from 'react';
-import { CH_PITCH, FONT, HEAP_TOP, isHorizontal, type Box } from '../model/geometry';
+import { CH_PITCH, CHUTE_SIZE, FONT, flareMarkerScale, HEAP_TOP, isHorizontal, type Box } from '../model/geometry';
 import type { Flow } from '../model/pivot';
 import { symbolOf, type Base, type Marker } from '../model/symbols';
 import { gear, MARKERS } from './markers';
@@ -53,7 +53,11 @@ function markerAt(base: Base, marker: Marker, b: Box, flow: Flow): { x: number; 
   if (marker === 'vis' || marker === 'engrenages' || marker === 'ecluse') return null;
   switch (base) {
     case 'pill': return { ...along(b, flow, 10), s: 0.42 };
-    case 'flare': return { ...along(b, flow, -13), s: 0.88 };
+    case 'flare': {
+      // Un seul marqueur, côté sorties, qui grandit avec l'épaisseur (canaux).
+      const s = flareMarkerScale(isHorizontal(flow) ? b.h : b.w);
+      return { ...along(b, flow, -(11 * s + 3)), s };
+    }
     case 'heap': return { x: b.cx, y: b.y0 + 7, s: 0.42 };
     case 'crusher': return { x: b.cx, y: b.cy + 1, s: Math.min(1.15, (b.h - 4) / 22) };
     case 'frame': return { x: b.x0 + 10, y: b.cy, s: 0.62 };
@@ -268,20 +272,18 @@ export function Tag({ text, x, y, dim, outside, halo, anchor = 'middle' }: { tex
   );
 }
 
-/** Goulotte de tri : bande verticale avec son libellé. */
+/**
+ * Goulotte de tri : petit rectangle (moitié d'un poste opérateur), sans asservissement ; elles
+ * s'assemblent bord à bord. Libellé au survol seulement (title).
+ */
 export function ChuteShape({ x, y, label, selected }: { x: number; y: number; label: string; selected?: boolean }) {
+  const { w, h } = CHUTE_SIZE;
   return (
     <g>
-      {selected && <rect x={x - 16} y={y - 57} width={32} height={114} rx={9} fill="none" stroke="var(--pid-select)" strokeWidth={1.5} />}
-      <rect x={x - 11} y={y - 52} width={22} height={104} rx={7} fill="var(--pid-chute)" stroke="var(--pid-stroke)" strokeWidth={1} />
-      <text
-        transform={`translate(${x} ${y}) rotate(-90)`}
-        textAnchor="middle"
-        dominantBaseline="central"
-        style={{ font: `500 ${FONT.chute}px var(--font-sans)`, fill: 'var(--pid-caption)', pointerEvents: 'none' }}
-      >
-        {label}
-      </text>
+      <title>{label}</title>
+      {selected && <rect x={x - w / 2 - 2.5} y={y - h / 2 - 2.5} width={w + 5} height={h + 5} rx={2} fill="none" stroke="var(--pid-select)" strokeWidth={1.5} />}
+      <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={1} fill="var(--pid-chute)" stroke="var(--pid-stroke)" strokeWidth={1} />
+      <path d={`M${x - w / 2 + 3} ${y - h / 2 + 3}L${x} ${y + h / 2 - 3}L${x + w / 2 - 3} ${y - h / 2 + 3}`} fill="none" stroke="var(--pid-divider)" strokeWidth={0.8} />
     </g>
   );
 }
